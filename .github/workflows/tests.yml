@@ -1,0 +1,41 @@
+
+name: Tests
+
+on:
+  push:
+    branches: [ master ]
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'true'
+          lfs: 'true'
+
+      - name: Check
+        run: |
+          ls external/highfive
+          ls external/mujoco
+
+      - name: Create Build Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libhdf5-dev libboost-all-dev protobuf-compiler libprotobuf-dev cmake
+
+      - name: Configure CMake
+        run: |
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBACKPROP_TOOLS_ENABLE_TESTS:BOOL=ON -DBACKPROP_TOOLS_ENABLE_TENSORBOARD:BOOL=ON -DBACKPROP_TOOLS_ENABLE_HDF5:BOOL=ON -DBACKPROP_TOOLS_ENABLE_CLI11:BOOL=ON
+
+      - name: Build
+        run: |
+          cd build
+          cmake --build . -j $(nproc)
+
+      - name: Test
+        run: |
+          cd build
+          ctest
