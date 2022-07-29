@@ -49,4 +49,27 @@ namespace backprop_tools::devices{
 #endif
     };
     namespace esp32{
-        template <type
+        template <typename T_SPEC>
+        struct Generic: ESP32<T_SPEC>{};
+        template <typename T_SPEC>
+        struct DSP: ESP32<T_SPEC>{};
+        template <typename T_SPEC>
+        struct OPT: ESP32<T_SPEC>{};
+    }
+
+    template <esp32::Hardware T_HARDWARE = esp32::Hardware::DEFAULT>
+    using DefaultESP32Specification = esp32::Specification<math::ESP32, random::ESP32, logging::ESP32, T_HARDWARE>;
+    using DefaultESP32 = esp32::OPT<DefaultESP32Specification<>>;
+}
+
+namespace backprop_tools{
+#ifdef BACKPROP_TOOLS_DEBUG_CONTAINER_COUNT_MALLOC
+    template <typename DEV_SPEC, typename TI>
+    void count_malloc(devices::ESP32<DEV_SPEC>& device, TI size){
+        device.malloc_counter += size;
+    }
+#endif
+}
+
+
+#endif
