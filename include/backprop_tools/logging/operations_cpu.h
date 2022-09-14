@@ -38,4 +38,9 @@ namespace backprop_tools{
     void add_scalar(DEVICE& device, devices::logging::CPU* logger, const TOPIC, const ARG){ /* noop */ }
     template <typename DEVICE, typename TOPIC, typename ARG, typename CADENCE>
     void add_scalar(DEVICE& device, devices::logging::CPU* logger, const TOPIC, const ARG, const CADENCE){ /* noop */ }
-    template <typename DEVICE, typename TOPIC, typename ARG, typename ARG_L
+    template <typename DEVICE, typename TOPIC, typename ARG, typename ARG_LEN, typename CADENCE>
+    void add_histogram(DEVICE& device, devices::logging::CPU* logger, const TOPIC, const ARG*, const ARG_LEN, const CADENCE){ /* noop */ }
+    template <typename DEVICE, typename TOPIC, typename ARG, typename ARG_LEN>
+    void add_histogram(DEVICE& device, devices::logging::CPU* logger, const TOPIC, const ARG*, const ARG_LEN){ /* noop */ }
+}
+#endif
