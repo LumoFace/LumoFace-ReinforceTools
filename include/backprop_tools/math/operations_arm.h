@@ -40,4 +40,43 @@ namespace backprop_tools::math {
         return std::pow(x, y);
     }
     template<typename T>
-    auto log(const devices::math
+    auto log(const devices::math::ARM&, const T x) {
+        return std::log(x);
+    }
+    template<typename T>
+    auto floor(const devices::math::ARM&, const T x) {
+        return std::floor(x);
+    }
+    template<typename T>
+    auto is_nan(const devices::math::ARM&, const T x) {
+        return isnan(x);
+    }
+    template<typename T>
+    auto is_finite(const devices::math::ARM&, const T x) {
+        return std::isfinite(x);
+    }
+    template<typename T>
+    T clamp(const devices::math::ARM&, T x, T min, T max){
+//        return std::clamp(x, min, max);
+        return x < min ? min : (x > max ? max : x);
+    }
+    template<typename T>
+    T min(const devices::math::ARM&, T x, T y){
+//        return std::min(x, y);
+        return x < y ? x : y;
+    }
+    template<typename T>
+    T max(const devices::math::ARM&, T x, T y){
+//        return std::max(x, y);
+        return x > y ? x : y;
+    }
+    template<typename T>
+    T abs(const devices::math::ARM&, T x){
+        return std::abs(x);
+    }
+    template<typename T>
+    T nan(const devices::math::ARM&){
+        return NAN;
+    }
+}
+#endif
