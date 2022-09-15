@@ -70,4 +70,8 @@ namespace backprop_tools::math {
     }
     template<typename T>
     T nan(const devices::math::Dummy&){
-        retur
+        return 0;
+    }
+
+}
+#endif
