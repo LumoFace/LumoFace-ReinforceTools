@@ -58,4 +58,21 @@ namespace backprop_tools::math {
     T clamp(const devices::math::CPU&, T x, T min, T max){
         return std::clamp(x, min, max);
     }
-   
+    template<typename T>
+    T min(const devices::math::CPU&, T x, T y){
+        return std::min(x, y);
+    }
+    template<typename T>
+    T max(const devices::math::CPU&, T x, T y){
+        return std::max(x, y);
+    }
+    template<typename T>
+    T abs(const devices::math::CPU&, T x){
+        return std::abs(x);
+    }
+    template<typename T>
+    T nan(const devices::math::CPU&){
+        return std::numeric_limits<T>::quiet_NaN();
+    }
+}
+#endif
