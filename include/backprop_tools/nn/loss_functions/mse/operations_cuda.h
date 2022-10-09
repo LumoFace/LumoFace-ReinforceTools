@@ -51,4 +51,10 @@ namespace backprop_tools::nn::loss_functions::mse {
         constexpr typename devices::CUDA<DEV_SPEC>::index_t N_BLOCKS_ACTIVATION_BATCH = BACKPROP_TOOLS_DEVICES_CUDA_CEIL(BATCH_SIZE, BLOCKSIZE_ACTIVATION_BATCH);
         constexpr typename devices::CUDA<DEV_SPEC>::index_t N_BLOCKS_ACTIVATION_OUTPUT = BACKPROP_TOOLS_DEVICES_CUDA_CEIL(OUTPUT_DIM, BLOCKSIZE_ACTIVATION_OUTPUT);
         dim3 activation_grid(N_BLOCKS_ACTIVATION_OUTPUT, N_BLOCKS_ACTIVATION_BATCH);
-        dim3 activation_block(BLOCKSIZE
+        dim3 activation_block(BLOCKSIZE_ACTIVATION_OUTPUT, BLOCKSIZE_ACTIVATION_BATCH);
+        internal::mse::d_mse_d_x_kernel<<<activation_grid, activation_block>>>(device, a, b, d_a, loss_weight);
+        check_status(device);
+    }
+}
+
+#endif
