@@ -58,4 +58,7 @@ namespace backprop_tools{
     template<typename DEVICE, typename SPEC, typename OPTIMIZER>
     void reset_optimizer_state(DEVICE& device, nn::parameters::Adam::instance<SPEC>& p1, OPTIMIZER& optimizer) {
         set_all(device, p1.gradient_first_order_moment, 0);
-        set_all(device, p1.gradient_seco
+        set_all(device, p1.gradient_second_order_moment, 0);
+    }
+}
+#endif
