@@ -99,3 +99,46 @@ namespace backprop_tools {
         MatrixDynamic<TICK_TOCK_SPEC> layer_output_tick;
         MatrixDynamic<TICK_TOCK_SPEC> layer_output_tock;
 #else
+        MatrixStatic<TICK_TOCK_SPEC> layer_output_tick;
+        MatrixStatic<TICK_TOCK_SPEC> layer_output_tock;
+#endif
+        malloc(device, layer_output_tick);
+        malloc(device, layer_output_tock);
+        evaluate_memless(device, network, input, output, layer_output_tick, layer_output_tock);
+        free(device, layer_output_tick);
+        free(device, layer_output_tock);
+    }
+
+    // forward modifies intermediate outputs and pre activations to facilitate backward pass
+    template<typename DEVICE, typename MODEL_SPEC, typename INPUT_SPEC, typename OUTPUT_SPEC, typename TEMP_SPEC>
+    void forward_memless(DEVICE& device, const nn_models::mlp::NeuralNetwork<MODEL_SPEC>& network, const Matrix<INPUT_SPEC>& input, Matrix<OUTPUT_SPEC>& output, Matrix<TEMP_SPEC>& layer_output_tick, Matrix<TEMP_SPEC>& layer_output_tock){
+        static_assert(nn_models::mlp::check_input_output<MODEL_SPEC, INPUT_SPEC, OUTPUT_SPEC>);
+        constexpr auto BATCH_SIZE = INPUT_SPEC::ROWS;
+        static_assert(TEMP_SPEC::ROWS == BATCH_SIZE);
+        static_assert(TEMP_SPEC::COLS == MODEL_SPEC::HIDDEN_DIM);
+
+        forward(network.input_layer, input, layer_output_tick);
+        for (typename DEVICE::index_t layer_i = 0; layer_i < MODEL_SPEC::NUM_HIDDEN_LAYERS; layer_i++){
+            if(layer_i % 2 == 0){
+                forward(network.hidden_layers[layer_i], layer_output_tick, layer_output_tock);
+            } else {
+                forward(network.hidden_layers[layer_i], layer_output_tock, layer_output_tick);
+            }
+        }
+        if constexpr(MODEL_SPEC::NUM_HIDDEN_LAYERS % 2 == 0){
+            forward(network.output_layer, layer_output_tick, output);
+        } else {
+            forward(network.output_layer, layer_output_tock, output);
+        }
+    }
+    template<typename DEVICE, typename MODEL_SPEC, typename INPUT_SPEC, typename OUTPUT_SPEC, typename BUFFER_MODEL_SPEC>
+    void forward(DEVICE& device, const nn_models::mlp::NeuralNetwork<MODEL_SPEC>& network, const Matrix<INPUT_SPEC>& input, Matrix<OUTPUT_SPEC>& output, nn_models::mlp::NeuralNetworkBuffers<BUFFER_MODEL_SPEC> buffers){
+        static_assert(BUFFER_MODEL_SPEC::BATCH_SIZE == OUTPUT_SPEC::ROWS);
+        forward_memless(device, network, input, output, buffers.tick, buffers.tock);
+    }
+    template<typename DEVICE, typename MODEL_SPEC, typename INPUT_SPEC>
+    void forward(DEVICE& device, nn_models::mlp::NeuralNetworkBackwardGradient<MODEL_SPEC>& network, const Matrix<INPUT_SPEC>& input) {
+        forward(device, network.input_layer, input);
+
+        auto current_output = network.input_layer.output;
+        for (typename DEVICE::index_t layer_i = 0; layer_i < MODEL_SPEC::NUM_HIDDEN_LAYERS; 
