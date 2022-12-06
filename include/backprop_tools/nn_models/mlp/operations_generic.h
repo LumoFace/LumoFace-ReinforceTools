@@ -141,4 +141,42 @@ namespace backprop_tools {
         forward(device, network.input_layer, input);
 
         auto current_output = network.input_layer.output;
-        for (typename DEVICE::index_t layer_i = 0; layer_i < MODEL_SPEC::NUM_HIDDEN_LAYERS; 
+        for (typename DEVICE::index_t layer_i = 0; layer_i < MODEL_SPEC::NUM_HIDDEN_LAYERS; layer_i++){
+            forward(device, network.hidden_layers[layer_i], current_output);
+            current_output = network.hidden_layers[layer_i].output;
+        }
+        forward(device, network.output_layer, current_output);
+    }
+    template<typename DEVICE, typename MODEL_SPEC, typename INPUT_SPEC, typename OUTPUT_SPEC>
+    void forward(DEVICE& device, nn_models::mlp::NeuralNetworkBackwardGradient<MODEL_SPEC>& network, const Matrix<INPUT_SPEC>& input, Matrix<OUTPUT_SPEC>& output) {
+        static_assert(nn_models::mlp::check_input_output<MODEL_SPEC, INPUT_SPEC, OUTPUT_SPEC>);
+        forward(device, network, input);
+        copy(device, device, output, network.output_layer.output);
+    }
+
+    template<typename DEVICE, typename SPEC>
+    void zero_gradient(DEVICE& device, nn_models::mlp::NeuralNetwork<SPEC>& network) {
+        zero_gradient(device, network.input_layer);
+        for(typename DEVICE::index_t i = 0; i < SPEC::NUM_HIDDEN_LAYERS; i++){
+            zero_gradient(device, network.hidden_layers[i]);
+        }
+        zero_gradient(device, network.output_layer);
+    }
+    template<typename DEVICE, typename MODEL_SPEC, typename D_OUTPUT_SPEC, typename D_INPUT_SPEC, typename TEMP_SPEC>
+    void backward_memless(DEVICE& device, nn_models::mlp::NeuralNetworkBackward<MODEL_SPEC>& network, const Matrix<D_OUTPUT_SPEC>& d_output, Matrix<D_INPUT_SPEC>& d_input, Matrix<TEMP_SPEC>& d_layer_input_tick, Matrix<TEMP_SPEC>& d_layer_input_tock) {
+        static_assert(nn_models::mlp::check_input_output<MODEL_SPEC, D_INPUT_SPEC, D_OUTPUT_SPEC>);
+        constexpr auto BATCH_SIZE = D_INPUT_SPEC::ROWS;
+        static_assert(TEMP_SPEC::ROWS == BATCH_SIZE);
+        static_assert(TEMP_SPEC::COLS == MODEL_SPEC::HIDDEN_DIM);
+
+        backward(device, network.output_layer, d_output, d_layer_input_tick);
+        for (typename DEVICE::index_t layer_i_plus_one = MODEL_SPEC::NUM_HIDDEN_LAYERS; layer_i_plus_one > 0; layer_i_plus_one--){
+            typename DEVICE::index_t layer_i = layer_i_plus_one - 1;
+            if(layer_i % 2 == (MODEL_SPEC::NUM_HIDDEN_LAYERS - 1) % 2){ // we are starting with the last hidden layer where the result should go to tock
+                backward(device, network.hidden_layers[layer_i], d_layer_input_tick, d_layer_input_tock);
+            } else {
+                backward(device, network.hidden_layers[layer_i], d_layer_input_tock, d_layer_input_tick);
+            }
+        }
+        if constexpr(MODEL_SPEC::NUM_HIDDEN_LAYERS % 2 == 0){
+            backward(device,
