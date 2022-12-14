@@ -246,4 +246,40 @@ namespace backprop_tools {
         optimizer.first_order_moment_bias_correction  = 1/(1 - math::pow(typename DEVICE::SPEC::MATH(), ADAM_PARAMETERS::BETA_1, (T)network.age));
         optimizer.second_order_moment_bias_correction = 1/(1 - math::pow(typename DEVICE::SPEC::MATH(), ADAM_PARAMETERS::BETA_2, (T)network.age));
 
-        update(device, netw
+        update(device, network.input_layer, optimizer);
+        for(typename DEVICE::index_t layer_i = 0; layer_i < SPEC::NUM_HIDDEN_LAYERS; layer_i++){
+            update(device, network.hidden_layers[layer_i], optimizer);
+        }
+        update(device, network.output_layer, optimizer);
+        network.age += 1;
+    }
+
+    template<typename DEVICE, typename SPEC>
+    void reset_optimizer_state(DEVICE& device, nn_models::mlp::NeuralNetworkSGD<SPEC>& network) {
+    }
+
+    template<typename DEVICE, typename SPEC, typename OPTIMIZER>
+    void reset_optimizer_state(DEVICE& device, nn_models::mlp::NeuralNetworkAdam<SPEC>& network, OPTIMIZER& optimizer) {
+        reset_optimizer_state(device, network.input_layer, optimizer);
+        for(typename DEVICE::index_t layer_i = 0; layer_i < SPEC::NUM_HIDDEN_LAYERS; layer_i++){
+            reset_optimizer_state(device, network.hidden_layers[layer_i], optimizer);
+        }
+        reset_optimizer_state(device, network.output_layer, optimizer);
+        network.age = 1;
+    }
+
+    // The following copy operators are more powerful than the default copy assignment operator in that they can e.g. copy between networks with different activation functions
+    template<typename TARGET_DEVICE, typename SOURCE_DEVICE,  typename TARGET_SPEC, typename SOURCE_SPEC>
+    void copy(TARGET_DEVICE& target_device, SOURCE_DEVICE& source_device, nn_models::mlp::NeuralNetwork<TARGET_SPEC>& target, const nn_models::mlp::NeuralNetwork<SOURCE_SPEC>& source){
+        static_assert(backprop_tools::nn_models::mlp::check_spec_memory<typename TARGET_SPEC::STRUCTURE_SPEC, typename SOURCE_SPEC::STRUCTURE_SPEC>, "The target and source network must have the same structure");
+        copy(target_device, source_device, target.input_layer, source.input_layer);
+        for(typename TARGET_SPEC::TI layer_i = 0; layer_i <  TARGET_SPEC::NUM_HIDDEN_LAYERS; layer_i++){
+            copy(target_device, source_device, target.hidden_layers[layer_i], source.hidden_layers[layer_i]);
+        }
+        copy(target_device, source_device, target.output_layer, source.output_layer);
+    }
+
+    template<typename TARGET_DEVICE, typename SOURCE_DEVICE, typename TARGET_SPEC, typename SOURCE_SPEC>
+    void copy(TARGET_DEVICE& target_device, SOURCE_DEVICE& source_device, nn_models::mlp::NeuralNetworkAdam<TARGET_SPEC>& target, const nn_models::mlp::NeuralNetworkAdam<SOURCE_SPEC>& source){
+        static_assert(backprop_tools::nn_models::mlp::check_spec_memory<typename TARGET_SPEC::STRUCTURE_SPEC, typename SOURCE_SPEC::STRUCTURE_SPEC>, "The target and source network must have the same structure");
+        copy(target_device, source_device, (nn_models::ml
