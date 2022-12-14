@@ -282,4 +282,46 @@ namespace backprop_tools {
     template<typename TARGET_DEVICE, typename SOURCE_DEVICE, typename TARGET_SPEC, typename SOURCE_SPEC>
     void copy(TARGET_DEVICE& target_device, SOURCE_DEVICE& source_device, nn_models::mlp::NeuralNetworkAdam<TARGET_SPEC>& target, const nn_models::mlp::NeuralNetworkAdam<SOURCE_SPEC>& source){
         static_assert(backprop_tools::nn_models::mlp::check_spec_memory<typename TARGET_SPEC::STRUCTURE_SPEC, typename SOURCE_SPEC::STRUCTURE_SPEC>, "The target and source network must have the same structure");
-        copy(target_device, source_device, (nn_models::ml
+        copy(target_device, source_device, (nn_models::mlp::NeuralNetwork<TARGET_SPEC>&)target, (nn_models::mlp::NeuralNetwork<SOURCE_SPEC>&)source);
+        target.age = source.age;
+    }
+
+    template<typename DEVICE, typename SPEC>
+    void reset_forward_state(DEVICE& device, nn_models::mlp::NeuralNetwork<SPEC>& n){
+        reset_forward_state(device, n.input_layer);
+        for(typename DEVICE::index_t layer_i = 0; layer_i <  SPEC::NUM_HIDDEN_LAYERS; layer_i++){
+            reset_forward_state(device, n.hidden_layers[layer_i]);
+        }
+        reset_forward_state(device, n.output_layer);
+    }
+
+    template<typename DEVICE, typename SPEC_1, typename SPEC_2>
+    typename SPEC_1::T abs_diff(DEVICE& device, nn_models::mlp::NeuralNetwork<SPEC_1>& n1, const nn_models::mlp::NeuralNetwork<SPEC_2>& n2){
+        static_assert(backprop_tools::nn_models::mlp::check_spec_memory<typename SPEC_1::STRUCTURE_SPEC, typename SPEC_2::STRUCTURE_SPEC>, "The target and source network must have the same structure");
+        typename SPEC_1::T acc = 0;
+
+        acc += abs_diff(device, n1.output_layer, n2.output_layer);
+        for(typename DEVICE::index_t layer_i = 0; layer_i < SPEC_1::NUM_HIDDEN_LAYERS; layer_i++){
+            acc += abs_diff(device, n1.hidden_layers[layer_i], n2.hidden_layers[layer_i]);
+        }
+        acc += abs_diff(device, n1.input_layer, n2.input_layer);
+        return acc;
+    }
+    template <typename DEVICE, typename SPEC>
+    bool is_nan(DEVICE& device, const backprop_tools::nn_models::mlp::NeuralNetwork<SPEC>& n) {
+        bool found_nan = false;
+        found_nan = found_nan || is_nan(device, n.input_layer);
+        for(typename DEVICE::index_t layer_i = 0; layer_i < SPEC::NUM_HIDDEN_LAYERS; layer_i++){
+            found_nan = found_nan || is_nan(device, n.hidden_layers[layer_i]);
+        }
+        found_nan = found_nan || is_nan(device, n.output_layer);
+        return found_nan;
+    }
+    template<typename TARGET_DEVICE, typename SOURCE_DEVICE,  typename TARGET_SPEC, typename SOURCE_SPEC>
+    void copy(TARGET_DEVICE& target_device, SOURCE_DEVICE& source_device, nn_models::mlp::NeuralNetworkBuffers<TARGET_SPEC>& target, const nn_models::mlp::NeuralNetworkBuffers<SOURCE_SPEC>& source){
+        copy(target_device, source_device, target.tick, source.tick);
+        copy(target_device, source_device, target.tock, source.tock);
+    }
+    template<typename TARGET_DEVICE, typename SOURCE_DEVICE,  typename TARGET_SPEC, typename SOURCE_SPEC>
+    void copy(TARGET_DEVICE& target_device, SOURCE_DEVICE& source_device, nn_models::mlp::NeuralNetworkBuffersForwardBackward<TARGET_SPEC>& target, const nn_models::mlp::NeuralNetworkBuffersForwardBackward<SOURCE_SPEC>& source){
+        copy(target_device, source_device, (nn_models::mlp::NeuralNetworkBuffers<
