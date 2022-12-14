@@ -44,4 +44,22 @@ namespace backprop_tools{
         ss << ind << "    " << (const_declaration ? "const " : "") << "backprop_tools::nn_models::mlp::NeuralNetwork<SPEC> mlp = {";
         ss << "input_layer::layer, ";
         ss << "{";
-        for(TI hidden_laye
+        for(TI hidden_layer_i = 0; hidden_layer_i < SPEC::NUM_HIDDEN_LAYERS; hidden_layer_i++){
+            if(hidden_layer_i > 0){
+                ss << ", ";
+            }
+            ss << "hidden_layer_" << hidden_layer_i << "::layer";
+        }
+        ss << "}, ";
+        ss << "output_layer::layer";
+        ss << "};\n";
+
+        ss << ind << "}\n";
+        return {ss_header.str(), ss.str()};
+    }
+    template<typename DEVICE, typename SPEC>
+    std::string save(DEVICE& device, nn_models::mlp::NeuralNetwork<SPEC>& network, std::string name, bool const_declaration = false, typename DEVICE::index_t indent = 0) {
+        auto code = save_split(device, network, name, const_declaration, indent);
+        return code.header + code.body;
+    }
+}
