@@ -210,4 +210,40 @@ namespace backprop_tools {
             }
         }
         if constexpr(MODEL_SPEC::NUM_HIDDEN_LAYERS % 2 == 0){
-     
+            backward(device, network.input_layer, input, d_layer_input_tick, d_input);
+        } else {
+            backward(device, network.input_layer, input, d_layer_input_tock, d_input);
+        }
+    }
+    template<typename DEVICE, typename MODEL_SPEC, typename INPUT_SPEC, typename D_OUTPUT_SPEC, typename D_INPUT_SPEC, typename BUFFER_MODEL_SPEC>
+    void backward(DEVICE& device, nn_models::mlp::NeuralNetworkBackwardGradient<MODEL_SPEC>& network, const Matrix<INPUT_SPEC>& input, Matrix<D_OUTPUT_SPEC>& d_output, Matrix<D_INPUT_SPEC>& d_input, nn_models::mlp::NeuralNetworkBuffers<BUFFER_MODEL_SPEC> buffers) {
+        static_assert(BUFFER_MODEL_SPEC::BATCH_SIZE == D_INPUT_SPEC::ROWS);
+        backward_memless(device, network, input, d_output, d_input, buffers.tick, buffers.tock);
+    }
+
+    template<typename DEVICE, typename MODEL_SPEC, typename INPUT_SPEC, typename TARGET_SPEC, typename BUFFER_MODEL_SPEC>
+    void forward_backward_mse(DEVICE& device, nn_models::mlp::NeuralNetworkBackwardGradient<MODEL_SPEC>& network, const Matrix<INPUT_SPEC>& input, const Matrix<TARGET_SPEC>& target, nn_models::mlp::NeuralNetworkBuffersForwardBackward<BUFFER_MODEL_SPEC> buffers, typename MODEL_SPEC::T loss_weight = 1) {
+        static_assert(BUFFER_MODEL_SPEC::BATCH_SIZE == INPUT_SPEC::ROWS);
+        static_assert(nn_models::mlp::check_input_output<MODEL_SPEC, INPUT_SPEC, TARGET_SPEC>);
+        forward(device, network, input);
+        nn::loss_functions::mse::gradient(device, network.output_layer.output, target, buffers.d_output, loss_weight);
+        backward(device, network, input, buffers.d_output, buffers.d_input, buffers);
+    }
+
+    template<typename DEVICE, typename SPEC, typename OPTIMIZER>
+    void update(DEVICE& device, nn_models::mlp::NeuralNetworkSGD<SPEC>& network, OPTIMIZER& optimizer) {
+        update_layer(device, network.input_layer, optimizer);
+        for (typename DEVICE::index_t layer_i = 0; layer_i < SPEC::NUM_HIDDEN_LAYERS; layer_i++){
+            update_layer(device, network.hidden_layers[layer_i], optimizer);
+        }
+        update_layer(device, network.output_layer, optimizer);
+    }
+
+
+    template<typename DEVICE, typename SPEC, typename ADAM_PARAMETERS>
+    void update(DEVICE& device, nn_models::mlp::NeuralNetworkAdam<SPEC>& network, nn::optimizers::Adam<ADAM_PARAMETERS>& optimizer) {
+        using T = typename SPEC::T;
+        optimizer.first_order_moment_bias_correction  = 1/(1 - math::pow(typename DEVICE::SPEC::MATH(), ADAM_PARAMETERS::BETA_1, (T)network.age));
+        optimizer.second_order_moment_bias_correction = 1/(1 - math::pow(typename DEVICE::SPEC::MATH(), ADAM_PARAMETERS::BETA_2, (T)network.age));
+
+        update(device, netw
