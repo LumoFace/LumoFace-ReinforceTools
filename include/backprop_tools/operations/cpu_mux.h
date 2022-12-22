@@ -76,4 +76,5 @@ namespace backprop_tools {
 #endif
 #endif
 #if defined(BACKPROP_TOOLS_BACKEND_ENABLE_CUDA) && defined(BACKPROP_TOOLS_OPERATIONS_CPU_MUX_INCLUDE_CUDA)
-#include <backprop_tools/operations/cuda/group_
+#include <backprop_tools/operations/cuda/group_3.h>
+#endif
