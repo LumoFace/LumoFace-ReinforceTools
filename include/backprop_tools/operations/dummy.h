@@ -4,6 +4,6 @@ namespace backprop_tools{
 }
 #endif
 
-#include "cuda/group_1.h"
-#include "cuda/group_2.h"
-#include "cuda/group_3.h"
+#include "dummy/group_1.h"
+#include "dummy/group_2.h"
+#include "dummy/group_3.h"
