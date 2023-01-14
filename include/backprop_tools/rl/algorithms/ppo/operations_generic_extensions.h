@@ -55,4 +55,42 @@ namespace backprop_tools{
         utils::assert_exit(device, ppo.initialized, "PPO not initialized");
 #endif
         using T = typename PPO_SPEC::T;
- 
+        using TI = typename PPO_SPEC::TI;
+        static_assert(utils::typing::is_same_v<typename PPO_SPEC::ENVIRONMENT, typename OPR_SPEC::ENVIRONMENT>, "environment mismatch");
+        using BUFFER = rl::components::on_policy_runner::Dataset<rl::components::on_policy_runner::DatasetSpecification<OPR_SPEC, STEPS_PER_ENV>>;
+        static_assert(BUFFER::STEPS_TOTAL > 0);
+        constexpr TI N_EPOCHS = PPO_SPEC::PARAMETERS::N_EPOCHS;
+        constexpr TI BATCH_SIZE = PPO_SPEC::BATCH_SIZE;
+        constexpr TI N_BATCHES = BUFFER::STEPS_TOTAL/BATCH_SIZE;
+        static_assert(N_BATCHES > 0);
+        constexpr TI ACTION_DIM = OPR_SPEC::ENVIRONMENT::ACTION_DIM;
+        constexpr TI OBSERVATION_DIM = OPR_SPEC::ENVIRONMENT::OBSERVATION_DIM;
+        constexpr bool NORMALIZE_OBSERVATIONS = PPO_SPEC::PARAMETERS::NORMALIZE_OBSERVATIONS;
+        auto all_observations = NORMALIZE_OBSERVATIONS ? dataset.all_observations_normalized : dataset.all_observations;
+        auto observations = NORMALIZE_OBSERVATIONS ? dataset.observations_normalized : dataset.observations;
+        // batch needs observations, original log-probs, advantages
+        T policy_kl_divergence = 0; // KL( current || old ) todo: make hyperparameter that swaps the order
+        if(PPO_SPEC::PARAMETERS::ADAPTIVE_LEARNING_RATE) {
+            copy(device, device, ppo_buffers.rollout_log_std, ppo.actor.log_std.parameters);
+        }
+        for(TI epoch_i = 0; epoch_i < N_EPOCHS; epoch_i++){
+            // shuffling
+            for(TI dataset_i = 0; dataset_i < BUFFER::STEPS_TOTAL; dataset_i++){
+                TI sample_index = random::uniform_int_distribution(typename DEVICE::SPEC::RANDOM(), dataset_i, BUFFER::STEPS_TOTAL-1, rng);
+                {
+                    auto target_row = row(device, observations, dataset_i);
+                    auto source_row = row(device, observations, sample_index);
+                    swap(device, target_row, source_row);
+                }
+                if(PPO_SPEC::PARAMETERS::ADAPTIVE_LEARNING_RATE){
+                    auto target_row = row(device, dataset.actions_mean, dataset_i);
+                    auto source_row = row(device, dataset.actions_mean, sample_index);
+                    swap(device, target_row, source_row);
+                }
+                {
+                    auto target_row = row(device, dataset.actions, dataset_i);
+                    auto source_row = row(device, dataset.actions, sample_index);
+                    swap(device, target_row, source_row);
+                }
+                swap(device, dataset.advantages      , dataset.advantages      , dataset_i, 0, sample_index, 0);
+                swap(device, dataset.action_log_probs, datase
