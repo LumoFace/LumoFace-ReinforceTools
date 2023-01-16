@@ -93,4 +93,37 @@ namespace backprop_tools{
                     swap(device, target_row, source_row);
                 }
                 swap(device, dataset.advantages      , dataset.advantages      , dataset_i, 0, sample_index, 0);
-                swap(device, dataset.action_log_probs, datase
+                swap(device, dataset.action_log_probs, dataset.action_log_probs, dataset_i, 0, sample_index, 0);
+                swap(device, dataset.target_values   , dataset.target_values   , dataset_i, 0, sample_index, 0);
+            }
+            for(TI batch_i = 0; batch_i < N_BATCHES; batch_i++){
+                T batch_policy_kl_divergence = 0; // KL( current || old ) todo: make hyperparameter that swaps the order
+                zero_gradient(device_evaluation, ppo_evaluation.critic);
+                zero_gradient(device_evaluation, ppo_evaluation.actor); // has to be reset before accumulating the action-log-std gradient
+
+                auto batch_offset = batch_i * BATCH_SIZE;
+                auto batch_observations     = view(device, observations            , matrix::ViewSpec<BATCH_SIZE, OBSERVATION_DIM>(), batch_offset, 0);
+                auto batch_actions_mean     = view(device, dataset.actions_mean    , matrix::ViewSpec<BATCH_SIZE, ACTION_DIM     >(), batch_offset, 0);
+                auto batch_actions          = view(device, dataset.actions         , matrix::ViewSpec<BATCH_SIZE, ACTION_DIM     >(), batch_offset, 0);
+                auto batch_action_log_probs = view(device, dataset.action_log_probs, matrix::ViewSpec<BATCH_SIZE, 1              >(), batch_offset, 0);
+                auto batch_advantages       = view(device, dataset.advantages      , matrix::ViewSpec<BATCH_SIZE, 1              >(), batch_offset, 0);
+                auto batch_target_values    = view(device, dataset.target_values   , matrix::ViewSpec<BATCH_SIZE, 1              >(), batch_offset, 0);
+
+                T advantage_mean = 0;
+                T advantage_std = 0;
+                for(TI batch_step_i = 0; batch_step_i < BATCH_SIZE; batch_step_i++){
+                    T advantage = get(batch_advantages, batch_step_i, 0);
+                    advantage_mean += advantage;
+                    advantage_std += advantage * advantage;
+                }
+                advantage_mean /= BATCH_SIZE;
+                advantage_std /= BATCH_SIZE;
+
+                advantage_std = math::sqrt(typename DEVICE::SPEC::MATH(), advantage_std - advantage_mean * advantage_mean);
+//                add_scalar(device, device.logger, "ppo/advantage/mean", advantage_mean);
+//                add_scalar(device, device.logger, "ppo/advantage/std", advantage_std);
+
+                copy(device_evaluation, device, hybrid_buffers.observations, batch_observations);
+                forward(device_evaluation, ppo_evaluation.actor, hybrid_buffers.observations, hybrid_buffers.actions);
+                copy(device, device_evaluation, ppo_buffers.current_batch_actions, hybrid_buffers.actions);
+//                auto abs_diff = abs_diff(device, batch_actions, buffer.actions);
