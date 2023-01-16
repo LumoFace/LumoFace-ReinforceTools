@@ -127,3 +127,33 @@ namespace backprop_tools{
                 forward(device_evaluation, ppo_evaluation.actor, hybrid_buffers.observations, hybrid_buffers.actions);
                 copy(device, device_evaluation, ppo_buffers.current_batch_actions, hybrid_buffers.actions);
 //                auto abs_diff = abs_diff(device, batch_actions, buffer.actions);
+
+                copy(device, device_evaluation, ppo.actor.log_std.parameters, ppo_evaluation.actor.log_std.parameters);
+                copy(device, device_evaluation, ppo.actor.log_std.gradient, ppo_evaluation.actor.log_std.gradient);
+                for(TI batch_step_i = 0; batch_step_i < BATCH_SIZE; batch_step_i++){
+                    T action_log_prob = 0;
+                    for(TI action_i = 0; action_i < ACTION_DIM; action_i++){
+
+                        T current_action = get(ppo_buffers.current_batch_actions, batch_step_i, action_i);
+                        T rollout_action = get(batch_actions, batch_step_i, action_i);
+                        T current_action_log_std = get(ppo.actor.log_std.parameters, 0, action_i);
+                        T current_action_std = math::exp(typename DEVICE::SPEC::MATH(), current_action_log_std);
+                        if(PPO_SPEC::PARAMETERS::ADAPTIVE_LEARNING_RATE){
+                            T rollout_action_log_std = get(ppo_buffers.rollout_log_std, 0, action_i);
+                            T rollout_action_std = math::exp(typename DEVICE::SPEC::MATH(), rollout_action_log_std);
+                            T rollout_action_mean = get(batch_actions_mean, batch_step_i, action_i);
+                            T action_mean_diff = rollout_action_mean - current_action;
+                            T kl = rollout_action_log_std - current_action_log_std;
+                            kl += (current_action_std * current_action_std + action_mean_diff * action_mean_diff)/(2 * rollout_action_std * rollout_action_std + PPO_SPEC::PARAMETERS::POLICY_KL_EPSILON);
+                            kl += (T)-0.5;
+                            kl = math::max(typename DEVICE::SPEC::MATH(), kl, (T)0);
+                            policy_kl_divergence += kl;
+                            batch_policy_kl_divergence += kl;
+                        }
+
+                        T action_diff_by_action_std = (current_action - rollout_action) / current_action_std;
+                        action_log_prob += -0.5 * action_diff_by_action_std * action_diff_by_action_std - current_action_log_std - 0.5 * math::log(typename DEVICE::SPEC::MATH(), 2 * math::PI<T>);
+                        set(ppo_buffers.d_action_log_prob_d_action, batch_step_i, action_i, - action_diff_by_action_std / current_action_std);
+                        T current_entropy = current_action_log_std + math::log(typename DEVICE::SPEC::MATH(), 2 * math::PI<T>)/(T)2 + (T)1/(T)2;
+                        T current_entropy_loss = -(T)1/BATCH_SIZE * PPO_SPEC::PARAMETERS::ACTION_ENTROPY_COEFFICIENT * current_entropy;
+                        // todo: think about possible implementation detail: clipping entrop
