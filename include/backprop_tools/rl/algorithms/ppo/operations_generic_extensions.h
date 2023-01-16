@@ -156,4 +156,31 @@ namespace backprop_tools{
                         set(ppo_buffers.d_action_log_prob_d_action, batch_step_i, action_i, - action_diff_by_action_std / current_action_std);
                         T current_entropy = current_action_log_std + math::log(typename DEVICE::SPEC::MATH(), 2 * math::PI<T>)/(T)2 + (T)1/(T)2;
                         T current_entropy_loss = -(T)1/BATCH_SIZE * PPO_SPEC::PARAMETERS::ACTION_ENTROPY_COEFFICIENT * current_entropy;
-                        // todo: think about possible implementation detail: clipping entrop
+                        // todo: think about possible implementation detail: clipping entropy bonus as well (because it changes the distribution)
+                        if(PPO_SPEC::PARAMETERS::LEARN_ACTION_STD){
+                            T d_entropy_loss_d_current_action_log_std = -(T)1/BATCH_SIZE * PPO_SPEC::PARAMETERS::ACTION_ENTROPY_COEFFICIENT;
+                            increment(ppo.actor.log_std.gradient, 0, action_i, d_entropy_loss_d_current_action_log_std);
+//                          derivation: d_current_action_log_prob_d_action_log_std
+//                          d_current_action_log_prob_d_action_std =  (-action_diff_by_action_std) * (-action_diff_by_action_std)      / action_std - 1 / action_std)
+//                          d_current_action_log_prob_d_action_std = ((-action_diff_by_action_std) * (-action_diff_by_action_std) - 1) / action_std)
+//                          d_current_action_log_prob_d_action_std = (action_diff_by_action_std * action_diff_by_action_std - 1) / action_std
+//                          d_current_action_log_prob_d_action_log_std = (action_diff_by_action_std * action_diff_by_action_std - 1) / action_std * exp(action_log_std)
+//                          d_current_action_log_prob_d_action_log_std = (action_diff_by_action_std * action_diff_by_action_std - 1) / action_std * action_std
+//                          d_current_action_log_prob_d_action_log_std =  action_diff_by_action_std * action_diff_by_action_std - 1
+                            T d_current_action_log_prob_d_action_log_std = action_diff_by_action_std * action_diff_by_action_std - 1;
+                            set(ppo_buffers.d_action_log_prob_d_action_log_std, batch_step_i, action_i, d_current_action_log_prob_d_action_log_std);
+                        }
+                    }
+                    T rollout_action_log_prob = get(batch_action_log_probs, batch_step_i, 0);
+                    T advantage = get(batch_advantages, batch_step_i, 0);
+                    if(PPO_SPEC::PARAMETERS::NORMALIZE_ADVANTAGE){
+                        advantage = (advantage - advantage_mean) / (advantage_std + PPO_SPEC::PARAMETERS::ADVANTAGE_EPSILON);
+                    }
+                    T log_ratio = action_log_prob - rollout_action_log_prob;
+                    T ratio = math::exp(typename DEVICE::SPEC::MATH(), log_ratio);
+                    // todo: test relative clipping (clipping in log space makes more sense thatn clipping in exp space)
+                    T clipped_ratio = math::clamp(typename DEVICE::SPEC::MATH(), ratio, 1 - PPO_SPEC::PARAMETERS::EPSILON_CLIP, 1 + PPO_SPEC::PARAMETERS::EPSILON_CLIP);
+                    T normal_advantage = ratio * advantage;
+                    T clipped_advantage = clipped_ratio * advantage;
+                    T slippage = 0.0;
+                    bool ratio_min_switch = normal_advantag
