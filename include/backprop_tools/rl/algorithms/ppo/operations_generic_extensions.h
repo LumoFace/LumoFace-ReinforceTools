@@ -183,4 +183,34 @@ namespace backprop_tools{
                     T normal_advantage = ratio * advantage;
                     T clipped_advantage = clipped_ratio * advantage;
                     T slippage = 0.0;
-                    bool ratio_min_switch = normal_advantag
+                    bool ratio_min_switch = normal_advantage - clipped_advantage <= slippage;
+                    T clipped_surrogate = ratio_min_switch ? normal_advantage : clipped_advantage;
+
+                    T d_loss_d_clipped_surrogate = -(T)1/BATCH_SIZE;
+                    T d_clipped_surrogate_d_ratio = ratio_min_switch ? advantage : 0;
+                    T d_ratio_d_action_log_prob = ratio;
+                    T d_loss_d_action_log_prob = d_loss_d_clipped_surrogate * d_clipped_surrogate_d_ratio * d_ratio_d_action_log_prob;
+                    for(TI action_i = 0; action_i < ACTION_DIM; action_i++){
+                        multiply(ppo_buffers.d_action_log_prob_d_action, batch_step_i, action_i, d_loss_d_action_log_prob);
+                        if(PPO_SPEC::PARAMETERS::LEARN_ACTION_STD){
+                            T current_d_action_log_prob_d_action_log_std = get(ppo_buffers.d_action_log_prob_d_action_log_std, batch_step_i, action_i);
+                            increment(ppo.actor.log_std.gradient, 0, action_i, d_loss_d_action_log_prob * current_d_action_log_prob_d_action_log_std);
+                        }
+                    }
+                }
+                if(PPO_SPEC::PARAMETERS::ADAPTIVE_LEARNING_RATE){
+                    batch_policy_kl_divergence /= BATCH_SIZE;
+                    if(batch_policy_kl_divergence > 2 * PPO_SPEC::PARAMETERS::ADAPTIVE_LEARNING_RATE_POLICY_KL_THRESHOLD){
+                        actor_optimizer.alpha = math::max(typename DEVICE::SPEC::MATH(), actor_optimizer.alpha * PPO_SPEC::PARAMETERS::ADAPTIVE_LEARNING_RATE_DECAY, PPO_SPEC::PARAMETERS::ADAPTIVE_LEARNING_RATE_MIN);
+                    }
+                    if(batch_policy_kl_divergence < 0.5 * PPO_SPEC::PARAMETERS::ADAPTIVE_LEARNING_RATE_POLICY_KL_THRESHOLD){
+                        actor_optimizer.alpha = math::min(typename DEVICE::SPEC::MATH(), actor_optimizer.alpha / PPO_SPEC::PARAMETERS::ADAPTIVE_LEARNING_RATE_DECAY, PPO_SPEC::PARAMETERS::ADAPTIVE_LEARNING_RATE_MAX);
+                    }
+                }
+                copy(device_evaluation, device, ppo_evaluation.actor.log_std.parameters, ppo.actor.log_std.parameters);
+                copy(device_evaluation, device, ppo_evaluation.actor.log_std.gradient, ppo.actor.log_std.gradient);
+
+                copy(device_evaluation, device, hybrid_buffers.d_action_log_prob_d_action, ppo_buffers.d_action_log_prob_d_action);
+                backward(device_evaluation, ppo_evaluation.actor, hybrid_buffers.observations, hybrid_buffers.d_action_log_prob_d_action, hybrid_buffers.d_observations, actor_buffers);
+                copy(device_evaluation, device, hybrid_buffers.target_values, batch_target_values);
+                forward_backward
