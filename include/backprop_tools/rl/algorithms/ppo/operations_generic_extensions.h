@@ -213,4 +213,16 @@ namespace backprop_tools{
                 copy(device_evaluation, device, hybrid_buffers.d_action_log_prob_d_action, ppo_buffers.d_action_log_prob_d_action);
                 backward(device_evaluation, ppo_evaluation.actor, hybrid_buffers.observations, hybrid_buffers.d_action_log_prob_d_action, hybrid_buffers.d_observations, actor_buffers);
                 copy(device_evaluation, device, hybrid_buffers.target_values, batch_target_values);
-                forward_backward
+                forward_backward_mse(device_evaluation, ppo_evaluation.critic, hybrid_buffers.observations, hybrid_buffers.target_values, critic_buffers);
+                update(device_evaluation, ppo_evaluation.actor, actor_optimizer);
+                update(device_evaluation, ppo_evaluation.critic, critic_optimizer);
+            }
+        }
+        if(PPO_SPEC::PARAMETERS::ADAPTIVE_LEARNING_RATE) {
+            policy_kl_divergence /= N_EPOCHS * N_BATCHES * BATCH_SIZE;
+            add_scalar(device, device.logger, "ppo/policy_kl", policy_kl_divergence);
+        }
+    }
+
+}
+#endif
