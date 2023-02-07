@@ -66,4 +66,25 @@ namespace backprop_tools::rl::components::off_policy_runner{
             for (TI thread_i = 0; thread_i < NUM_THREADS; thread_i++) {
                 threads.emplace_back([NUM_THREADS, &device, thread_i, &runner, &rngs](){
                     for (TI env_i = thread_i; env_i < SPEC::N_ENVIRONMENTS; env_i += NUM_THREADS) {
-                        epilogue_per_env(device, &runner,
+                        epilogue_per_env(device, &runner, rngs[env_i], env_i);
+                    }
+                });
+            }
+
+            for (auto& thread : threads) {
+                thread.join();
+            }
+        }
+        else{
+            for (TI env_i = 0; env_i < SPEC::N_ENVIRONMENTS; env_i++) {
+                epilogue_per_env(device, &runner, rng, env_i);
+            }
+        }
+
+    }
+}
+#ifndef BACKPROP_TOOLS_RL_COMPONENTS_OFF_POLICY_RUNNER_OPERATIONS_CPU_DELAY_OPERATIONS_GENERIC_INCLUDE
+#include "operations_generic.h"
+#endif
+
+#endif
