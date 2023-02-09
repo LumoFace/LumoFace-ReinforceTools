@@ -48,4 +48,52 @@ namespace backprop_tools{
                     set(batch->next_observations, batch_step_i, i, get(replay_buffer.next_observations, sample_index, i));
                 }
                 for(typename DEVICE::index_t i = 0; i < BATCH::ACTION_DIM; i++){
-            
+                    set(batch->actions, batch_step_i, i, get(replay_buffer.actions, sample_index, i));
+                }
+
+                set(batch->rewards, 0, batch_step_i, get(replay_buffer.rewards, sample_index, 0));
+                set(batch->terminated, 0, batch_step_i, get(replay_buffer.terminated, sample_index, 0));
+                set(batch->truncated, 0, batch_step_i, get(replay_buffer.truncated,  sample_index, 0));
+            }
+        }
+
+        template<typename DEVICE, typename SPEC, typename RNG>
+        __global__
+        void prologue_kernel(DEVICE device, rl::components::OffPolicyRunner<SPEC>* runner, RNG rng) {
+            using T = typename SPEC::T;
+            using TI = typename SPEC::TI;
+            // if the episode is done (step limit activated for STEP_LIMIT > 0) or if the step is the first step for this runner, reset the environment
+            TI env_i = threadIdx.x + blockIdx.x * blockDim.x;
+            curandState rng_state;
+            curand_init(rng, env_i, 0, &rng_state);
+            if(env_i < SPEC::N_ENVIRONMENTS){
+                prologue_per_env(device, runner, rng_state, env_i);
+            }
+        }
+        template<typename DEV_SPEC, typename SPEC, typename RNG>
+        void prologue(devices::CUDA<DEV_SPEC>& device, rl::components::OffPolicyRunner<SPEC>* runner, RNG &rng) {
+            using DEVICE = devices::CUDA<DEV_SPEC>;
+            using T = typename SPEC::T;
+            using TI = typename SPEC::TI;
+            constexpr TI BLOCKSIZE_COLS = 32;
+            constexpr TI N_BLOCKS_COLS = BACKPROP_TOOLS_DEVICES_CUDA_CEIL(SPEC::N_ENVIRONMENTS, BLOCKSIZE_COLS);
+            dim3 grid(N_BLOCKS_COLS);
+            dim3 block(BLOCKSIZE_COLS);
+            prologue_kernel<<<grid, block>>>(device, runner, rng);
+            check_status(device);
+        }
+        template<typename DEV_SPEC, typename SPEC, typename POLICY>
+        void interlude(devices::CUDA<DEV_SPEC>& device, rl::components::OffPolicyRunner<SPEC>& runner, POLICY &policy, typename POLICY::template Buffers<SPEC::N_ENVIRONMENTS>& policy_eval_buffers) {
+            // runner struct should be on the CPU while its buffers should be on the GPU
+            evaluate(device, policy, runner.buffers.observations, runner.buffers.actions, policy_eval_buffers);
+        }
+
+        template<typename DEVICE, typename SPEC, typename RNG>
+        __global__
+        void epilogue_kernel(DEVICE device, rl::components::OffPolicyRunner<SPEC>* runner, RNG rng) {
+            using T = typename SPEC::T;
+            using TI = typename SPEC::TI;
+
+            TI env_i = threadIdx.x + blockIdx.x * blockDim.x;
+            curandState rng_state;
+            curand_init(rng, en
