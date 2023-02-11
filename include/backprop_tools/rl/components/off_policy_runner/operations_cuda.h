@@ -96,4 +96,40 @@ namespace backprop_tools{
 
             TI env_i = threadIdx.x + blockIdx.x * blockDim.x;
             curandState rng_state;
-            curand_init(rng, en
+            curand_init(rng, env_i, 0, &rng_state);
+            if(env_i < SPEC::N_ENVIRONMENTS){
+                epilogue_per_env(device, runner, rng_state, env_i);
+            }
+        }
+        template<typename DEV_SPEC, typename SPEC, typename RNG>
+        void epilogue(devices::CUDA<DEV_SPEC>& device, rl::components::OffPolicyRunner<SPEC>* runner, RNG& rng) {
+            using DEVICE = devices::CUDA<DEV_SPEC>;
+            using T = typename SPEC::T;
+            using TI = typename SPEC::TI;
+            constexpr TI BLOCKSIZE_COLS = 32;
+            constexpr TI N_BLOCKS_COLS = BACKPROP_TOOLS_DEVICES_CUDA_CEIL(SPEC::N_ENVIRONMENTS, BLOCKSIZE_COLS);
+            dim3 grid(N_BLOCKS_COLS);
+            dim3 block(BLOCKSIZE_COLS);
+            epilogue_kernel<<<grid, block>>>(device, runner, rng);
+            check_status(device);
+        }
+    }
+    template <typename DEV_SPEC, typename SPEC, typename BATCH_SPEC, typename RNG, bool DETERMINISTIC = false>
+    void gather_batch(devices::CUDA<DEV_SPEC>& device, const rl::components::OffPolicyRunner<SPEC>* runner, rl::components::off_policy_runner::Batch<BATCH_SPEC>* batch, RNG rng){
+        static_assert(utils::typing::is_same_v<RNG, random::cuda::RNG>);
+        using DEVICE = devices::CUDA<DEV_SPEC>;
+        static_assert(utils::typing::is_same_v<SPEC, typename BATCH_SPEC::SPEC>);
+        using T = typename SPEC::T;
+        using TI = typename SPEC::TI;
+        constexpr typename DEVICE::index_t BATCH_SIZE = BATCH_SPEC::BATCH_SIZE;
+        constexpr TI BLOCKSIZE_COLS = 32;
+        constexpr TI N_BLOCKS_COLS = BACKPROP_TOOLS_DEVICES_CUDA_CEIL(BATCH_SIZE, BLOCKSIZE_COLS);
+        dim3 bias_grid(N_BLOCKS_COLS);
+        dim3 bias_block(BLOCKSIZE_COLS);
+        rl::components::off_policy_runner::gather_batch_kernel<DEVICE, SPEC, BATCH_SPEC, RNG, DETERMINISTIC><<<bias_grid, bias_block>>>(runner, batch, rng);
+        check_status(device);
+    }
+}
+
+
+#endif
