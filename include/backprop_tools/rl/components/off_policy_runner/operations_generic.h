@@ -53,4 +53,56 @@ namespace backprop_tools{
     void free(DEVICE& device, rl::components::off_policy_runner::Buffers<SPEC>& buffers) {
         free(device, buffers.observations);
         free(device, buffers.actions);
-        free(device, buffers.n
+        free(device, buffers.next_observations);
+    }
+    template <typename DEVICE, typename SPEC>
+    void free(DEVICE& device, rl::components::off_policy_runner::EpisodeStats<SPEC>& episode_stats) {
+        free(device, episode_stats.data);
+        episode_stats.returns._data = nullptr;
+        episode_stats.steps._data = nullptr;
+    }
+    template<typename DEVICE, typename SPEC>
+    void free(DEVICE& device, rl::components::OffPolicyRunner<SPEC> &runner) {
+        free(device, runner.buffers);
+        free(device, runner.states);
+        free(device, runner.episode_return);
+        free(device, runner.episode_step);
+        free(device, runner.truncated);
+        for (typename DEVICE::index_t env_i = 0; env_i < SPEC::N_ENVIRONMENTS; env_i++){
+            free(device, runner.replay_buffers[env_i]);
+            free(device, runner.episode_stats[env_i]);
+        }
+    }
+    template <typename DEVICE, typename SPEC>
+    void free(DEVICE& device, rl::components::off_policy_runner::Batch<SPEC>& batch) {
+        free(device, batch.observations_actions_next_observations);
+        batch.observations.            _data = nullptr;
+        batch.actions.                 _data = nullptr;
+        batch.next_observations.       _data = nullptr;
+        batch.observations_and_actions._data = nullptr;
+        free(device, batch.rewards);
+        free(device, batch.terminated);
+        free(device, batch.truncated);
+    }
+    template<typename DEVICE, typename SPEC>
+    void init(DEVICE& device, rl::components::OffPolicyRunner<SPEC> &runner, typename SPEC::ENVIRONMENT envs[SPEC::N_ENVIRONMENTS]) {
+        set_all(device, runner.truncated, true);
+        for (typename DEVICE::index_t env_i = 0; env_i < SPEC::N_ENVIRONMENTS; env_i++){
+            init(device, runner.replay_buffers[env_i]);
+            runner.envs[env_i] = envs[env_i];
+        }
+#ifdef BACKPROP_TOOLS_DEBUG_RL_COMPONENTS_OFF_POLICY_RUNNER_CHECK_INIT
+        runner.initialized = true;
+#endif
+    }
+    namespace rl::components::off_policy_runner{
+        template<typename DEVICE, typename SPEC, typename RNG>
+        void prologue(DEVICE& device, rl::components::OffPolicyRunner<SPEC>& runner, RNG &rng) {
+            using TI = typename DEVICE::index_t;
+            for (TI env_i = 0; env_i < SPEC::N_ENVIRONMENTS; env_i++) {
+                prologue_per_env(device, &runner, rng, env_i);
+            }
+        }
+        template<typename DEVICE, typename SPEC, typename POLICY, typename POLICY_BUFFERS>
+        void interlude(DEVICE& device, rl::components::OffPolicyRunner<SPEC>& runner, POLICY &policy, POLICY_BUFFERS& policy_eval_buffers) {
+            evaluate(device, policy, runner.buf
