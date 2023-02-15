@@ -105,4 +105,41 @@ namespace backprop_tools{
         }
         template<typename DEVICE, typename SPEC, typename POLICY, typename POLICY_BUFFERS>
         void interlude(DEVICE& device, rl::components::OffPolicyRunner<SPEC>& runner, POLICY &policy, POLICY_BUFFERS& policy_eval_buffers) {
-            evaluate(device, policy, runner.buf
+            evaluate(device, policy, runner.buffers.observations, runner.buffers.actions, policy_eval_buffers);
+        }
+
+        template<typename DEVICE, typename SPEC, typename RNG>
+        void epilogue(DEVICE& device, rl::components::OffPolicyRunner<SPEC>& runner, RNG &rng) {
+            using TI = typename DEVICE::index_t;
+            for (TI env_i = 0; env_i < SPEC::N_ENVIRONMENTS; env_i++){
+                epilogue_per_env(device, &runner, rng, env_i);
+            }
+        }
+    }
+    template<typename DEVICE, typename SPEC, typename POLICY, typename POLICY_BUFFERS, typename RNG>
+    void step(DEVICE& device, rl::components::OffPolicyRunner<SPEC>& runner, POLICY& policy, POLICY_BUFFERS& policy_eval_buffers, RNG &rng) {
+#ifdef BACKPROP_TOOLS_DEBUG_RL_COMPONENTS_OFF_POLICY_RUNNER_CHECK_INIT
+        utils::assert_exit(device, runner.initialized, "OffPolicyRunner not initialized");
+#endif
+        static_assert(POLICY::INPUT_DIM == SPEC::ENVIRONMENT::OBSERVATION_DIM,
+                      "The policy's input dimension must match the environment's observation dimension.");
+        static_assert(POLICY::OUTPUT_DIM == SPEC::ENVIRONMENT::ACTION_DIM,
+                      "The policy's output dimension must match the environment's action dimension.");
+        // todo: increase efficiency by removing the double observation of each state
+        using T = typename SPEC::T;
+        using TI = typename SPEC::TI;
+        using ENVIRONMENT = typename SPEC::ENVIRONMENT;
+
+        rl::components::off_policy_runner::prologue(device, runner, rng);
+        rl::components::off_policy_runner::interlude(device, runner, policy, policy_eval_buffers);
+        rl::components::off_policy_runner::epilogue(device, runner, rng);
+    }
+    template <typename DEVICE, typename SPEC, typename BATCH_SPEC, typename RNG, bool DETERMINISTIC = false>
+    void gather_batch(DEVICE& device, const rl::components::ReplayBuffer<SPEC>& replay_buffer, rl::components::off_policy_runner::Batch<BATCH_SPEC>& batch, typename DEVICE::index_t batch_step_i, RNG& rng) {
+#ifdef BACKPROP_TOOLS_DEBUG_RL_COMPONENTS_OFF_POLICY_RUNNER_GATHER_BATCH_CHECK_REPLAY_BUFFER_POSITION
+        utils::assert_exit(device, replay_buffer.position > 0, "Replay buffer is empty");
+#endif
+        typename DEVICE::index_t sample_index_max = (replay_buffer.full ? SPEC::CAPACITY : replay_buffer.position) - 1;
+        typename DEVICE::index_t sample_index = DETERMINISTIC ? batch_step_i : random::uniform_int_distribution( typename DEVICE::SPEC::RANDOM(), (typename DEVICE::index_t) 0, sample_index_max, rng);
+
+        auto observation_target = view<DEVICE, typename decltype(batch.observations)::SPEC, 1, SPEC::OBSERVATION_DIM>(device, batch.observations,
