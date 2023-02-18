@@ -142,4 +142,34 @@ namespace backprop_tools{
         typename DEVICE::index_t sample_index_max = (replay_buffer.full ? SPEC::CAPACITY : replay_buffer.position) - 1;
         typename DEVICE::index_t sample_index = DETERMINISTIC ? batch_step_i : random::uniform_int_distribution( typename DEVICE::SPEC::RANDOM(), (typename DEVICE::index_t) 0, sample_index_max, rng);
 
-        auto observation_target = view<DEVICE, typename decltype(batch.observations)::SPEC, 1, SPEC::OBSERVATION_DIM>(device, batch.observations,
+        auto observation_target = view<DEVICE, typename decltype(batch.observations)::SPEC, 1, SPEC::OBSERVATION_DIM>(device, batch.observations, batch_step_i, 0);
+        auto observation_source = view<DEVICE, typename decltype(replay_buffer.observations)::SPEC, 1, SPEC::OBSERVATION_DIM>(device, replay_buffer.observations, sample_index, 0);
+        copy(device, device, observation_target, observation_source);
+
+        auto action_target = view<DEVICE, typename decltype(batch.actions)::SPEC, 1, SPEC::ACTION_DIM>(device, batch.actions, batch_step_i, 0);
+        auto action_source = view<DEVICE, typename decltype(replay_buffer.actions)::SPEC, 1, SPEC::ACTION_DIM>(device, replay_buffer.actions, sample_index, 0);
+        copy(device, device, action_target, action_source);
+
+        auto next_observation_target = view<DEVICE, typename decltype(batch.next_observations)::SPEC, 1, SPEC::OBSERVATION_DIM>(device, batch.next_observations, batch_step_i, 0);
+        auto next_observation_source = view<DEVICE, typename decltype(replay_buffer.next_observations)::SPEC, 1, SPEC::OBSERVATION_DIM>(device, replay_buffer.next_observations, sample_index, 0);
+        copy(device, device, next_observation_target, next_observation_source);
+
+        set(batch.rewards, 0, batch_step_i, get(replay_buffer.rewards, sample_index, 0));
+        set(batch.terminated, 0, batch_step_i, get(replay_buffer.terminated, sample_index, 0));
+        set(batch.truncated, 0, batch_step_i, get(replay_buffer.truncated,  sample_index, 0));
+    }
+    template <typename DEVICE, typename SPEC, typename BATCH_SPEC, typename RNG, bool DETERMINISTIC=false>
+    void gather_batch(DEVICE& device, const rl::components::OffPolicyRunner<SPEC>& runner, rl::components::off_policy_runner::Batch<BATCH_SPEC>& batch, RNG& rng) {
+        static_assert(utils::typing::is_same_v<SPEC, typename BATCH_SPEC::SPEC>);
+        using T = typename SPEC::T;
+        using TI = typename SPEC::TI;
+        using RUNNER = rl::components::OffPolicyRunner<SPEC>;
+        constexpr typename DEVICE::index_t BATCH_SIZE = BATCH_SPEC::BATCH_SIZE;
+        for(typename DEVICE::index_t batch_step_i=0; batch_step_i < BATCH_SIZE; batch_step_i++) {
+            typename DEVICE::index_t env_i = DETERMINISTIC ? 0 : random::uniform_int_distribution( typename DEVICE::SPEC::RANDOM(), (typename DEVICE::index_t) 0, SPEC::N_ENVIRONMENTS - 1, rng);
+            auto& replay_buffer = runner.replay_buffers[env_i];
+            gather_batch<DEVICE, typename RUNNER::REPLAY_BUFFER_SPEC, BATCH_SPEC, RNG, DETERMINISTIC>(device, replay_buffer, batch, batch_step_i, rng);
+        }
+    }
+//    template<typename TARGET_DEVICE, typename SOURCE_DEVICE,  typename TARGET_SPEC, typename SOURCE_SPEC>
+//    void copy(TARGET_DEVICE& target_device, SOURCE_DEVICE& source_device, rl::components::off_pol
