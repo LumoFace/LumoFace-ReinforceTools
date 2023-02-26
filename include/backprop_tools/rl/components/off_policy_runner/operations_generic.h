@@ -172,4 +172,30 @@ namespace backprop_tools{
         }
     }
 //    template<typename TARGET_DEVICE, typename SOURCE_DEVICE,  typename TARGET_SPEC, typename SOURCE_SPEC>
-//    void copy(TARGET_DEVICE& target_device, SOURCE_DEVICE& source_device, rl::components::off_pol
+//    void copy(TARGET_DEVICE& target_device, SOURCE_DEVICE& source_device, rl::components::off_policy_runner::Batch<TARGET_SPEC>& target, const nn_models::mlp::NeuralNetworkBuffersForwardBackward<SOURCE_SPEC>& source){
+//        copy(target_device, source_device, (nn_models::mlp::NeuralNetworkBuffers<TARGET_SPEC>&)target, (nn_models::mlp::NeuralNetworkBuffers<SOURCE_SPEC>&)source);
+//        copy(target_device, source_device, target.d_input, source.d_input);
+//        copy(target_device, source_device, target.d_output, source.d_output);
+//    }
+    template <typename TARGET_DEVICE, typename SOURCE_DEVICE, typename TARGET_SPEC, typename SOURCE_SPEC>
+    void copy(TARGET_DEVICE& target_device, SOURCE_DEVICE& source_device, rl::components::off_policy_runner::Batch<TARGET_SPEC>& target, rl::components::off_policy_runner::Batch<SOURCE_SPEC>& source){
+        copy(target_device, source_device, target.observations_actions_next_observations, source.observations_actions_next_observations);
+        copy(target_device, source_device, target.rewards, source.rewards);
+        copy(target_device, source_device, target.terminated, source.terminated);
+        copy(target_device, source_device, target.truncated, source.truncated);
+    }
+    template <typename TARGET_DEVICE, typename SOURCE_DEVICE, typename TARGET_SPEC, typename SOURCE_SPEC>
+    void copy(TARGET_DEVICE& target_device, SOURCE_DEVICE& source_device, rl::components::off_policy_runner::Buffers<TARGET_SPEC>& target, rl::components::off_policy_runner::Buffers<SOURCE_SPEC>& source){
+        copy(target_device, source_device, target.observations, source.observations);
+        copy(target_device, source_device, target.actions, source.actions);
+        copy(target_device, source_device, target.next_observations, source.next_observations);
+    }
+    template <typename TARGET_DEVICE, typename SOURCE_DEVICE, typename TARGET_SPEC, typename SOURCE_SPEC>
+    void copy(TARGET_DEVICE& target_device, SOURCE_DEVICE& source_device, rl::components::off_policy_runner::EpisodeStats<TARGET_SPEC>& target, rl::components::off_policy_runner::EpisodeStats<SOURCE_SPEC>& source){
+        copy(target_device, source_device, target.data, source.data);
+    }
+    template <typename TARGET_DEVICE, typename SOURCE_DEVICE, typename TARGET_SPEC, typename SOURCE_SPEC>
+    void copy(TARGET_DEVICE& target_device, SOURCE_DEVICE& source_device, rl::components::OffPolicyRunner<TARGET_SPEC>& target, rl::components::OffPolicyRunner<SOURCE_SPEC>& source){
+        copy(target_device, source_device, target.buffers, source.buffers);
+        copy(target_device, source_device, target.states, source.states);
+        copy(target_device, source_device, target.episod
