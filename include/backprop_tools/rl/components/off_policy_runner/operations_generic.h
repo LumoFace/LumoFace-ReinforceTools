@@ -198,4 +198,18 @@ namespace backprop_tools{
     void copy(TARGET_DEVICE& target_device, SOURCE_DEVICE& source_device, rl::components::OffPolicyRunner<TARGET_SPEC>& target, rl::components::OffPolicyRunner<SOURCE_SPEC>& source){
         copy(target_device, source_device, target.buffers, source.buffers);
         copy(target_device, source_device, target.states, source.states);
-        copy(target_device, source_device, target.episod
+        copy(target_device, source_device, target.episode_return, source.episode_return);
+        copy(target_device, source_device, target.episode_step, source.episode_step);
+        copy(target_device, source_device, target.truncated, source.truncated);
+        for (typename TARGET_DEVICE::index_t env_i = 0; env_i < TARGET_SPEC::N_ENVIRONMENTS; env_i++){
+            copy(target_device, source_device, target.replay_buffers[env_i], source.replay_buffers[env_i]);
+            copy(target_device, source_device, target.episode_stats[env_i], source.episode_stats[env_i]);
+            target.envs[env_i] = source.envs[env_i];
+        }
+#ifdef BACKPROP_TOOLS_DEBUG_RL_COMPONENTS_OFF_POLICY_RUNNER_CHECK_INIT
+        target.initialized = source.initialized;
+#endif
+    }
+}
+
+#endif
