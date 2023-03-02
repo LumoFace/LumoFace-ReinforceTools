@@ -30,4 +30,30 @@ namespace backprop_tools::rl::components::on_policy_runner{
         std::vector<std::thread> threads;
 
         if(NUM_THREADS > 1){
-            auto base = random::uniform_int_distribution(typena
+            auto base = random::uniform_int_distribution(typename DEV_SPEC::RANDOM(), 0, 1000000, rng);
+
+            for (TI thread_i = 0; thread_i < NUM_THREADS; thread_i++) {
+                threads.emplace_back([NUM_THREADS, &device, thread_i, &dataset, &runner, &actions_mean, &actions, &action_log_std, &step_i, &base](){
+                    for (TI env_i = thread_i; env_i < SPEC::N_ENVIRONMENTS; env_i += NUM_THREADS) {
+                        auto rng = backprop_tools::random::default_engine(typename DEV_SPEC::RANDOM(), base + env_i);
+                        TI pos = step_i * SPEC::N_ENVIRONMENTS + env_i;
+                        per_env::epilogue(device, dataset, runner, actions_mean, actions, action_log_std, rng, pos, env_i);
+                    }
+                });
+            }
+
+            for (auto& thread : threads) {
+                thread.join();
+            }
+        }
+        else{
+            for (TI env_i = 0; env_i < SPEC::N_ENVIRONMENTS; env_i++) {
+                TI pos = step_i * SPEC::N_ENVIRONMENTS + env_i;
+                per_env::epilogue(device, dataset, runner, actions_mean, actions, action_log_std, rng, pos, env_i);
+            }
+        }
+    }
+}
+#ifndef BACKPROP_TOOLS_RL_COMPONENTS_ON_POLICY_RUNNER_OPERATIONS_CPU_DELAY_OPERATIONS_GENERIC_INCLUDE
+#include "operations_generic.h"
+#endif
