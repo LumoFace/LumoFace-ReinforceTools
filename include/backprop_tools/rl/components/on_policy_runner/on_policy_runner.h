@@ -74,4 +74,10 @@ namespace backprop_tools::rl::components{
         typename SPEC::CONTAINER_TYPE_TAG::template type<matrix::Specification<typename SPEC::ENVIRONMENT::State, TI, 1, SPEC::N_ENVIRONMENTS, matrix::layouts::RowMajorAlignment<TI, 1>>> states;
         typename SPEC::CONTAINER_TYPE_TAG::template type<matrix::Specification<bool                             , TI, 1, SPEC::N_ENVIRONMENTS, matrix::layouts::RowMajorAlignment<TI, 1>>> truncated;
         typename SPEC::CONTAINER_TYPE_TAG::template type<matrix::Specification<TI                               , TI, 1, SPEC::N_ENVIRONMENTS, matrix::layouts::RowMajorAlignment<TI, 1>>> episode_step;
-        typename SPEC::CONTAINER_TYPE_TAG::template type<matrix::Specification<T                                , TI, 1, SPEC::N_ENVIRONMENTS, matr
+        typename SPEC::CONTAINER_TYPE_TAG::template type<matrix::Specification<T                                , TI, 1, SPEC::N_ENVIRONMENTS, matrix::layouts::RowMajorAlignment<TI, 1>>> episode_return;
+#ifdef BACKPROP_TOOLS_DEBUG_RL_COMPONENTS_ON_POLICY_RUNNER_CHECK_INIT
+        bool initialized = false;
+#endif
+    };
+}
+#endif
