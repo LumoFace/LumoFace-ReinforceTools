@@ -19,4 +19,9 @@ namespace backprop_tools::rl::components{
         static constexpr TI DIM = SPEC::DIM;
 
         typename SPEC::CONTAINER_TYPE_TAG::template type<matrix::Specification<T, TI, 1, DIM>> mean;
-        typename SPEC::CONTAINER_TYPE_TAG::template type<m
+        typename SPEC::CONTAINER_TYPE_TAG::template type<matrix::Specification<T, TI, 1, DIM>> std;
+        TI age = 0;
+    };
+}
+
+#endif
