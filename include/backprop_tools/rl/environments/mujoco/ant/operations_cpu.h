@@ -23,4 +23,51 @@ namespace backprop_tools{
             delete vfs;
         }
 #ifdef BACKPROP_TOOLS_DEBUG_RL_ENVIRONMENTS_MUJOCO_CHECK_INIT
-        utils::assert_exit(device, env.model != nullptr,
+        utils::assert_exit(device, env.model != nullptr, error);
+#endif
+        env.data = mj_makeData(env.model);
+        for(TI state_i = 0; state_i < SPEC::STATE_DIM_Q; state_i++){
+            env.init_q[state_i] = env.data->qpos[state_i];
+        }
+        for(TI state_i = 0; state_i < SPEC::STATE_DIM_Q_DOT; state_i++){
+            env.init_q_dot[state_i] = env.data->qvel[state_i];
+        }
+        env.torso_id = mj_name2id(env.model, mjOBJ_XBODY, "torso");
+
+    }
+    template <typename DEVICE, typename SPEC>
+    void free(DEVICE& device, rl::environments::mujoco::Ant<SPEC>& env){
+        mj_deleteData(env.data);
+        mj_deleteModel(env.model);
+    }
+    template<typename DEVICE, typename SPEC, typename RNG>
+    BACKPROP_TOOLS_FUNCTION_PLACEMENT static void sample_initial_state(DEVICE& device, const rl::environments::mujoco::Ant<SPEC>& env, typename rl::environments::mujoco::ant::State<SPEC>& state, RNG& rng){
+        using T = typename SPEC::T;
+        using TI = typename DEVICE::index_t;
+        mj_resetData(env.model, env.data);
+        for(TI state_i = 0; state_i < SPEC::STATE_DIM_Q; state_i++){
+            state.q    [state_i] = env.init_q    [state_i] + random::uniform_real_distribution(typename DEVICE::SPEC::RANDOM(), -SPEC::PARAMETERS::RESET_NOISE_SCALE, SPEC::PARAMETERS::RESET_NOISE_SCALE, rng);
+        }
+        for(TI state_i = 0; state_i < SPEC::STATE_DIM_Q_DOT; state_i++){
+            state.q_dot[state_i] = env.init_q_dot[state_i] + random::normal_distribution(typename DEVICE::SPEC::RANDOM(), (T)0, SPEC::PARAMETERS::RESET_NOISE_SCALE, rng);
+        }
+        mj_forward(env.model, env.data);
+    }
+    template<typename DEVICE, typename SPEC>
+    static void initial_state(DEVICE& device, const rl::environments::mujoco::Ant<SPEC>& env, typename rl::environments::mujoco::ant::State<SPEC>& state){
+        using TI = typename DEVICE::index_t;
+        mj_resetData(env.model, env.data);
+        for(TI state_i = 0; state_i < SPEC::STATE_DIM_Q; state_i++){
+            state.q    [state_i] = env.init_q[state_i];
+        }
+        for(TI state_i = 0; state_i < SPEC::STATE_DIM_Q_DOT; state_i++){
+            state.q_dot[state_i] = env.init_q_dot[state_i];
+        }
+        mj_forward(env.model, env.data);
+    }
+    template<typename DEVICE, typename SPEC, typename ACTION_SPEC>
+    BACKPROP_TOOLS_FUNCTION_PLACEMENT typename SPEC::T step(DEVICE& device, rl::environments::mujoco::Ant<SPEC>& env, const rl::environments::mujoco::ant::State<SPEC>& state, const Matrix<ACTION_SPEC>& action, rl::environments::mujoco::ant::State<SPEC>& next_state) {
+        using T = typename SPEC::T;
+        using TI = typename DEVICE::index_t;
+        T x_pre = env.data->xpos[env.torso_id * 3];
+
