@@ -43,4 +43,61 @@ namespace backprop_tools::rl::environments::mujoco::ant {
                 return;
             }
             double dx = xpos - ui->lastx;
-            double 
+            double dy = ypos - ui->lasty;
+            ui->lastx = xpos;
+            ui->lasty = ypos;
+            int width, height;
+            glfwGetWindowSize(window, &width, &height);
+            bool mod_shift = (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT)==GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT)==GLFW_PRESS);
+            mjtMouse action;
+            if (ui->button_right) {
+                action = mod_shift ? mjMOUSE_MOVE_H : mjMOUSE_MOVE_V;
+            } else if (ui->button_left) {
+                action = mod_shift ? mjMOUSE_ROTATE_H : mjMOUSE_ROTATE_V;
+            } else {
+                action = mjMOUSE_ZOOM;
+            }
+            mjv_moveCamera(ui->env->model, action, dx/height, dy/height, &ui->scene, &ui->camera);
+        }
+
+        template <typename UI>
+        void scroll(GLFWwindow* window, double xoffset, double yoffset) {
+            UI* ui = (UI*)glfwGetWindowUserPointer(window);
+            mjv_moveCamera(ui->env->model, mjMOUSE_ZOOM, 0, -0.05*yoffset, &ui->scene, &ui->camera);
+        }
+    }
+}
+
+
+namespace backprop_tools{
+    template <typename DEVICE, typename ENVIRONMENT>
+    void init(DEVICE& dev, ENVIRONMENT& env, rl::environments::mujoco::ant::UI<ENVIRONMENT>& ui){
+        using UI = rl::environments::mujoco::ant::UI<ENVIRONMENT>;
+        ui.env = &env;
+        if (!glfwInit()) {
+            mju_error("Could not initialize GLFW");
+        }
+        ui.window = glfwCreateWindow(1200, 900, "Demo", NULL, NULL);
+        glfwSetWindowUserPointer(ui.window, &ui);
+        glfwMakeContextCurrent(ui.window);
+        glfwSwapInterval(1);
+
+        mjv_defaultCamera(&ui.camera);
+        ui.camera.type = mjCAMERA_TRACKING;
+        ui.camera.trackbodyid = env.torso_id;
+        ui.camera.distance = 6;
+        mjv_defaultOption(&ui.option);
+        mjv_defaultScene(&ui.scene);
+        mjr_defaultContext(&ui.context);
+
+        mjv_makeScene(ui.env->model, &ui.scene, 2000);
+        mjr_makeContext(ui.env->model, &ui.context, mjFONTSCALE_150);
+
+        glfwSetKeyCallback(ui.window, rl::environments::mujoco::ant::ui::callbacks::keyboard<UI>);
+        glfwSetCursorPosCallback(ui.window, rl::environments::mujoco::ant::ui::callbacks::mouse_move<UI>);
+        glfwSetMouseButtonCallback(ui.window, rl::environments::mujoco::ant::ui::callbacks::mouse_button<UI>);
+        glfwSetScrollCallback(ui.window, rl::environments::mujoco::ant::ui::callbacks::scroll<UI>);
+    }
+    template <typename DEVICE, typename ENVIRONMENT>
+    void set_state(DEVICE& dev, rl::environments::mujoco::ant::UI<ENVIRONMENT>& ui, const typename ENVIRONMENT::State& state){
+        using TI = typename DEVICE::index_
