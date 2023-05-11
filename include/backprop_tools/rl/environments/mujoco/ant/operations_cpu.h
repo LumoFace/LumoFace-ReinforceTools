@@ -112,4 +112,19 @@ namespace backprop_tools{
 
     template<typename DEVICE, typename SPEC, typename OBS_SPEC>
     BACKPROP_TOOLS_FUNCTION_PLACEMENT static void observe(DEVICE& device, const rl::environments::mujoco::Ant<SPEC>& env, const rl::environments::mujoco::ant::State<SPEC>& state, Matrix<OBS_SPEC>& observation){
-        using T = typename SPEC:
+        using T = typename SPEC::T;
+        using TI = typename DEVICE::index_t;
+        for(TI state_i = 0; state_i < SPEC::STATE_DIM_Q - 2; state_i++){
+            set(observation, 0, state_i, state.q[state_i + 2]);
+        }
+        for(TI state_i = 0; state_i < SPEC::STATE_DIM_Q_DOT; state_i++){
+            set(observation, 0, state_i + SPEC::STATE_DIM_Q - 2, state.q_dot[state_i]);
+        }
+    }
+    template<typename DEVICE, typename SPEC, typename RNG>
+    BACKPROP_TOOLS_FUNCTION_PLACEMENT static bool terminated(DEVICE& device, const rl::environments::mujoco::Ant<SPEC>& env, const typename rl::environments::mujoco::ant::State<SPEC> state, RNG& rng){
+        return env.last_terminated;
+    }
+}
+#include <backprop_tools/rl/environments/operations_generic.h>
+#endif
