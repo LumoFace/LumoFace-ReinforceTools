@@ -100,4 +100,36 @@ namespace backprop_tools{
     }
     template <typename DEVICE, typename ENVIRONMENT>
     void set_state(DEVICE& dev, rl::environments::mujoco::ant::UI<ENVIRONMENT>& ui, const typename ENVIRONMENT::State& state){
-        using TI = typename DEVICE::index_
+        using TI = typename DEVICE::index_t;
+        for(TI state_i = 0; state_i < ENVIRONMENT::SPEC::STATE_DIM_Q; state_i++){
+            ui.env->data->qpos[state_i] = state.q[state_i];
+        }
+        for(TI state_i = 0; state_i < ENVIRONMENT::SPEC::STATE_DIM_Q_DOT; state_i++){
+            ui.env->data->qvel[state_i] = state.q_dot[state_i];
+        }
+        mj_forward(ui.env->model, ui.env->data);
+        mjrRect viewport = {0, 0, 0, 0};
+        glfwGetFramebufferSize(ui.window, &viewport.width, &viewport.height);
+
+        mjv_updateScene(ui.env->model, ui.env->data, &ui.option, NULL, &ui.camera, mjCAT_ALL, &ui.scene);
+        mjr_render(viewport, &ui.scene, &ui.context);
+
+        glfwSwapBuffers(ui.window);
+
+        glfwPollEvents();
+    }
+
+    template <typename DEVICE, typename ENVIRONMENT>
+    void destruct(DEVICE& dev, ENVIRONMENT& env, rl::environments::mujoco::ant::UI<ENVIRONMENT>& ui){
+        mjv_freeScene(&ui.scene);
+        mjr_freeContext(&ui.context);
+
+#if defined(__APPLE__) || defined(_WIN32)
+        glfwTerminate();
+#endif
+    }
+
+
+}
+
+#endif
