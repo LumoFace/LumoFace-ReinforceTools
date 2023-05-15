@@ -58,4 +58,34 @@ namespace backprop_tools{
         typedef typename SPEC::T T;
         T angle_norm = angle_normalize(typename DEVICE::SPEC::MATH(), state.theta);
         T u_normalised = get(action, 0, 0);
-        T u = SPEC::PARAME
+        T u = SPEC::PARAMETERS::max_torque * u_normalised;
+        T costs = angle_norm * angle_norm + 0.1 * state.theta_dot * state.theta_dot + 0.001 * (u * u);
+        return -costs;
+    }
+
+    template<typename DEVICE, typename SPEC, typename OBS_SPEC>
+    BACKPROP_TOOLS_FUNCTION_PLACEMENT static void observe(DEVICE& device, const rl::environments::Pendulum<SPEC>& env, const typename rl::environments::Pendulum<SPEC>::State& state, Matrix<OBS_SPEC>& observation){
+        static_assert(OBS_SPEC::ROWS == 1);
+        static_assert(OBS_SPEC::COLS == 3);
+        typedef typename SPEC::T T;
+        set(observation, 0, 0, math::cos(typename DEVICE::SPEC::MATH(), state.theta));
+        set(observation, 0, 1, math::sin(typename DEVICE::SPEC::MATH(), state.theta));
+        set(observation, 0, 2, state.theta_dot);
+    }
+    template<typename DEVICE, typename SPEC>
+    BACKPROP_TOOLS_FUNCTION_PLACEMENT static typename SPEC::T get_serialized_state(DEVICE& device, const rl::environments::Pendulum<SPEC>& env, const typename rl::environments::Pendulum<SPEC>::State& state, typename DEVICE::index_t index){
+        if(index == 0) {
+            return state.theta;
+        }
+        else{
+            return state.theta_dot;
+        }
+    }
+    template<typename DEVICE, typename SPEC, typename RNG>
+    BACKPROP_TOOLS_FUNCTION_PLACEMENT static bool terminated(DEVICE& device, const rl::environments::Pendulum<SPEC>& env, const typename rl::environments::Pendulum<SPEC>::State state, RNG& rng){
+        using T = typename SPEC::T;
+        return false; //random::uniform_real_distribution(typename DEVICE::SPEC::RANDOM(), (T)0, (T)1, rng) > 0.9;
+    }
+}
+#include <backprop_tools/rl/environments/operations_generic.h>
+#endif
