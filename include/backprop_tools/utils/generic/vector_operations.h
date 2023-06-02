@@ -69,3 +69,102 @@ namespace backprop_tools::utils::vector_operations{
     BACKPROP_TOOLS_FUNCTION_PLACEMENT void add_accumulate(T const v[N], T out[N]) {
         for(typename DEVICE::index_t i = 0; i < N; i++) {
             out[i] += v[i];
+        }
+    }
+
+    template <typename DEVICE, typename T, auto N>
+    BACKPROP_TOOLS_FUNCTION_PLACEMENT void sub(T const v1[N], const T v2[N], T out[N]) {
+        for(typename DEVICE::index_t i = 0; i < N; i++) {
+            out[i] = v1[i] - v2[i];
+        }
+    }
+    template <typename DEVICE, typename T, auto N>
+    BACKPROP_TOOLS_FUNCTION_PLACEMENT void sub(T const v1[N], const T v2, T out[N]) {
+        for(typename DEVICE::index_t i = 0; i < N; i++) {
+            out[i] = v1[i] - v2;
+        }
+    }
+    template <typename DEVICE, typename T, auto N>
+    BACKPROP_TOOLS_FUNCTION_PLACEMENT void sub_accumulate(const T v1[N], const T v2[N], T out[N]) {
+        for(typename DEVICE::index_t i = 0; i < N; i++) {
+            out[i] += v1[i] - v2[i];
+        }
+    }
+    template <typename DEVICE, typename T, auto N>
+    BACKPROP_TOOLS_FUNCTION_PLACEMENT void sub_accumulate(const T v[N], T out[N]) {
+        for(typename DEVICE::index_t i = 0; i < N; i++) {
+            out[i] -= v[i];
+        }
+    }
+
+    template <typename DEVICE, typename T, auto N>
+    BACKPROP_TOOLS_FUNCTION_PLACEMENT void fill(T v[N], T s) {
+        for(typename DEVICE::index_t i = 0; i < N; i++) {
+            v[i] = s;
+        }
+    }
+
+    template <typename DEVICE, typename T, auto N>
+    BACKPROP_TOOLS_FUNCTION_PLACEMENT void assign(const T source[N], T target[N]) {
+        for(typename DEVICE::index_t i = 0; i < N; i++) {
+            target[i] = source[i];
+        }
+    }
+
+    template <typename DEVICE, typename T, auto M, auto N>
+    BACKPROP_TOOLS_FUNCTION_PLACEMENT void assign(const T source[M][N], T target[M][N]) {
+        for(typename DEVICE::index_t i = 0; i < M; i++) {
+            for(typename DEVICE::index_t j = 0; j < N; j++) {
+                target[i][j] = source[i][j];
+            }
+        }
+    }
+
+    template <typename DEVICE, typename T, auto M, auto N, auto P>
+    BACKPROP_TOOLS_FUNCTION_PLACEMENT void assign(const T source[M][N][P], T target[M][N][P]) {
+        for(typename DEVICE::index_t i = 0; i < M; i++) {
+            for(typename DEVICE::index_t j = 0; j < N; j++) {
+                for(typename DEVICE::index_t k = 0; k < P; k++) {
+                    target[i][j][k] = source[i][j][k];
+                }
+            }
+        }
+    }
+    template <typename DEVICE, typename T, auto M, auto N, auto P>
+    BACKPROP_TOOLS_FUNCTION_PLACEMENT void assign(const T source[P], T target[M][N][P]) {
+        for(typename DEVICE::index_t i = 0; i < M; i++) {
+            for(typename DEVICE::index_t j = 0; j < N; j++) {
+                for(typename DEVICE::index_t k = 0; k < P; k++) {
+                    target[i][j][k] = source[k];
+                }
+            }
+        }
+    }
+
+    template <typename DEVICE, typename T, auto N>
+    BACKPROP_TOOLS_FUNCTION_PLACEMENT T norm(const T source[N]) {
+        T acc = 0;
+        for(typename DEVICE::index_t i = 0; i < N; i++) {
+            acc += source[i]*source[i];
+        }
+        return math::sqrt(typename DEVICE::SPEC::MATH(), acc);
+    }
+    template <typename DEVICE, typename T, auto N>
+    BACKPROP_TOOLS_FUNCTION_PLACEMENT void normalize(const T source[N], T target[N]) {
+        T n = norm(source);
+        for(typename DEVICE::index_t i = 0; i < N; i++) {
+            target[i] = source[i]/n;
+        }
+    }
+    template <typename DEVICE, typename T, auto N>
+    BACKPROP_TOOLS_FUNCTION_PLACEMENT T mean(const T source[N]) {
+        T acc = 0;
+        for(typename DEVICE::index_t i = 0; i < N; i++) {
+            acc += source[i];
+        }
+        return acc/N;
+    }
+}
+
+
+#endif
