@@ -245,3 +245,21 @@ void run(){
             std::chrono::duration<T> elapsed = end - start;
             std::cout << "Total: " << elapsed.count() << " s" << std::endl;
         }
+
+        bpt::free(device, ppo);
+        bpt::free(device, ppo_buffers);
+        bpt::free(device, on_policy_runner_dataset);
+        bpt::free(device, on_policy_runner);
+        bpt::free(device, actor_eval_buffers);
+        bpt::free(device, actor_buffers);
+        bpt::free(device, critic_buffers);
+        bpt::free(device, critic_buffers_gae);
+        bpt::free(device, observation_normalizer);
+        for(auto& env : envs){
+            bpt::free(device, env);
+        }
+        bpt::free(device, evaluation_env);
+        bpt::destruct(device, device.logger);
+    }
+
+}
