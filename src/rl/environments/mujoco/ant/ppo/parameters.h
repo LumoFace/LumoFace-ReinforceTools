@@ -45,4 +45,18 @@ namespace parameters_0{
         using PPO_TYPE = bpt::rl::algorithms::PPO<PPO_SPEC>;
         using PPO_BUFFERS_TYPE = bpt::rl::algorithms::ppo::Buffers<PPO_SPEC>;
 
-        static constexpr TI O
+        static constexpr TI ON_POLICY_RUNNER_STEP_LIMIT = 1000;
+        static constexpr TI N_ENVIRONMENTS = 64;
+        using ON_POLICY_RUNNER_SPEC = bpt::rl::components::on_policy_runner::Specification<T, TI, ENVIRONMENT, N_ENVIRONMENTS, ON_POLICY_RUNNER_STEP_LIMIT>;
+        using ON_POLICY_RUNNER_TYPE = bpt::rl::components::OnPolicyRunner<ON_POLICY_RUNNER_SPEC>;
+        static constexpr TI ON_POLICY_RUNNER_STEPS_PER_ENV = 64;
+        using ON_POLICY_RUNNER_DATASET_SPEC = bpt::rl::components::on_policy_runner::DatasetSpecification<ON_POLICY_RUNNER_SPEC, ON_POLICY_RUNNER_STEPS_PER_ENV>;
+        using ON_POLICY_RUNNER_DATASET_TYPE = bpt::rl::components::on_policy_runner::Dataset<ON_POLICY_RUNNER_DATASET_SPEC>;
+
+
+        using ACTOR_EVAL_BUFFERS = typename ACTOR_TYPE::template Buffers<ON_POLICY_RUNNER_SPEC::N_ENVIRONMENTS>;
+        using ACTOR_BUFFERS = typename ACTOR_TYPE::template BuffersForwardBackward<BATCH_SIZE>;
+        using CRITIC_BUFFERS = typename CRITIC_TYPE::template BuffersForwardBackward<BATCH_SIZE>;
+        using CRITIC_BUFFERS_GAE = typename CRITIC_TYPE::template BuffersForwardBackward<ON_POLICY_RUNNER_DATASET_SPEC::STEPS_TOTAL_ALL>;
+    };
+}
