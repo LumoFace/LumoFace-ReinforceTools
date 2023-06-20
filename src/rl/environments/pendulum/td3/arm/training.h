@@ -60,4 +60,57 @@ using ActorCriticType = bpt::rl::algorithms::td3::ActorCritic<TD3_SPEC>;
 
 constexpr DEVICE::index_t N_STEPS = 10000;
 constexpr DEVICE::index_t EVALUATION_INTERVAL = 1000;
-c
+constexpr DEVICE::index_t N_EVALUATIONS = N_STEPS / EVALUATION_INTERVAL;
+#ifndef BACKPROP_TOOLS_DISABLE_EVALUATION
+DTYPE evaluation_returns[N_EVALUATIONS];
+#endif
+
+constexpr typename DEVICE::index_t REPLAY_BUFFER_CAP = 10000;
+constexpr typename DEVICE::index_t ENVIRONMENT_STEP_LIMIT = 200;
+using OFF_POLICY_RUNNER_SPEC = bpt::rl::components::off_policy_runner::Specification<
+        DTYPE,
+        DEVICE::index_t,
+        ENVIRONMENT,
+        1,
+        REPLAY_BUFFER_CAP,
+        ENVIRONMENT_STEP_LIMIT,
+        bpt::rl::components::off_policy_runner::DefaultParameters<DTYPE>,
+        false,
+        0,
+        CONTAINER_TYPE_TAG_OFF_POLICY_RUNNER
+ >;
+#ifdef BACKPROP_TOOLS_DEPLOYMENT_ARDUINO
+EXTMEM bpt::rl::components::OffPolicyRunner<OFF_POLICY_RUNNER_SPEC> off_policy_runner;
+#else
+bpt::rl::components::OffPolicyRunner<OFF_POLICY_RUNNER_SPEC> off_policy_runner;
+#endif
+ActorCriticType actor_critic;
+
+const DTYPE STATE_TOLERANCE = 0.00001;
+constexpr int N_WARMUP_STEPS = ActorCriticType::SPEC::PARAMETERS::ACTOR_BATCH_SIZE;
+static_assert(ActorCriticType::SPEC::PARAMETERS::ACTOR_BATCH_SIZE == ActorCriticType::SPEC::PARAMETERS::CRITIC_BATCH_SIZE);
+
+ENVIRONMENT envs[decltype(off_policy_runner)::N_ENVIRONMENTS];
+
+bpt::rl::components::off_policy_runner::Batch<bpt::rl::components::off_policy_runner::BatchSpecification<decltype(off_policy_runner)::SPEC, ActorCriticType::SPEC::PARAMETERS::CRITIC_BATCH_SIZE>> critic_batch;
+bpt::rl::algorithms::td3::CriticTrainingBuffers<ActorCriticType::SPEC> critic_training_buffers;
+CRITIC_NETWORK_TYPE::BuffersForwardBackward<ActorCriticType::SPEC::PARAMETERS::CRITIC_BATCH_SIZE, CONTAINER_TYPE_TAG_TRAINING_BUFFERS> critic_buffers;
+
+bpt::rl::components::off_policy_runner::Batch<bpt::rl::components::off_policy_runner::BatchSpecification<decltype(off_policy_runner)::SPEC, ActorCriticType::SPEC::PARAMETERS::ACTOR_BATCH_SIZE>> actor_batch;
+bpt::rl::algorithms::td3::ActorTrainingBuffers<ActorCriticType::SPEC> actor_training_buffers;
+ACTOR_NETWORK_TYPE::Buffers<ActorCriticType::SPEC::PARAMETERS::ACTOR_BATCH_SIZE, CONTAINER_TYPE_TAG_TRAINING_BUFFERS> actor_buffers;
+ACTOR_NETWORK_TYPE::Buffers<OFF_POLICY_RUNNER_SPEC::N_ENVIRONMENTS, CONTAINER_TYPE_TAG_TRAINING_BUFFERS> actor_buffers_eval;
+
+typename CONTAINER_TYPE_TAG::template type<bpt::matrix::Specification<DTYPE, DEVICE::index_t, 1, ENVIRONMENT::OBSERVATION_DIM>> observations_mean;
+typename CONTAINER_TYPE_TAG::template type<bpt::matrix::Specification<DTYPE, DEVICE::index_t, 1, ENVIRONMENT::OBSERVATION_DIM>> observations_std;
+
+
+void train(){
+
+    DEVICE::SPEC::LOGGING logger;
+    DEVICE device;
+    device.logger = &logger;
+
+    OPTIMIZER optimizer;
+
+    auto rng = bpt::random::default_engine(DEV
