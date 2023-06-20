@@ -113,4 +113,53 @@ void train(){
 
     OPTIMIZER optimizer;
 
-    auto rng = bpt::random::default_engine(DEV
+    auto rng = bpt::random::default_engine(DEVICE::SPEC::RANDOM(), 1);
+
+    bool ui = false;
+
+    bpt::malloc(device, actor_critic);
+    bpt::malloc(device, off_policy_runner);
+    bpt::malloc(device, critic_batch);
+    bpt::malloc(device, critic_training_buffers);
+    bpt::malloc(device, critic_buffers);
+    bpt::malloc(device, actor_batch);
+    bpt::malloc(device, actor_training_buffers);
+    bpt::malloc(device, actor_buffers_eval);
+    bpt::malloc(device, actor_buffers);
+    bpt::malloc(device, observations_mean);
+    bpt::malloc(device, observations_std);
+
+#ifndef BACKPROP_TOOLS_DEPLOYMENT_ARDUINO
+#ifdef BACKPROP_TOOLS_DEBUG_CONTAINER_COUNT_MALLOC
+    std::cout << "malloc counter: " << device.malloc_counter << std::endl;
+#endif
+#endif
+
+
+    bpt::init(device, actor_critic, optimizer, rng);
+    bpt::init(device, off_policy_runner, envs);
+    bpt::set_all(device, observations_mean, 0);
+    bpt::set_all(device, observations_std, 1);
+
+
+#ifndef BACKPROP_TOOLS_DEPLOYMENT_ARDUINO
+    auto start_time = std::chrono::high_resolution_clock::now();
+    std::cout << "ActorCritic size: " << sizeof(actor_critic) << std::endl;
+    std::cout << "ActorCritic.actor size: " << sizeof(actor_critic.actor) << std::endl;
+    std::cout << "ActorCritic.actor_target size: " << sizeof(actor_critic.actor_target) << std::endl;
+    std::cout << "ActorCritic.critic_1 size: " << sizeof(actor_critic.critic_1) << std::endl;
+    std::cout << "ActorCritic.critic_2 size: " << sizeof(actor_critic.critic_2) << std::endl;
+    std::cout << "ActorCritic.critic_target_1 size: " << sizeof(actor_critic.critic_target_1) << std::endl;
+    std::cout << "ActorCritic.critic_target_2 size: " << sizeof(actor_critic.critic_target_2) << std::endl;
+    std::cout << "OffPolicyRunner size: " << sizeof(off_policy_runner) << std::endl;
+    std::cout << "OffPolicyRunner.replay_buffers size: " << sizeof(off_policy_runner.replay_buffers) << std::endl;
+    std::cout << "CriticBatch size: " << sizeof(critic_batch) << std::endl;
+    std::cout << "CriticTrainingBuffers size: " << sizeof(critic_training_buffers) << std::endl;
+    std::cout << "CriticBuffers size: " << sizeof(critic_buffers) << std::endl;
+    std::cout << "ActorBatch size: " << sizeof(actor_batch) << std::endl;
+    std::cout << "ActorTrainingBuffers size: " << sizeof(actor_training_buffers) << std::endl;
+    std::cout << "ActorBuffers size: " << sizeof(actor_buffers) << std::endl;
+    std::cout << "Total: " << sizeof(actor_critic) + sizeof(off_policy_runner) + sizeof(critic_batch) + sizeof(critic_training_buffers) + sizeof(critic_buffers) + sizeof(actor_batch) + sizeof(actor_training_buffers) + sizeof(actor_buffers) << std::endl;
+#endif
+
+    for(int step_i = 0; step_i
