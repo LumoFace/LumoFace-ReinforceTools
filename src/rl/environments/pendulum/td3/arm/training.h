@@ -218,4 +218,12 @@ void train(){
     bpt::free(device, off_policy_runner);
     bpt::free(device, critic_batch);
     bpt::free(device, critic_training_buffers);
-    bpt::free(device, critic_buffers
+    bpt::free(device, critic_buffers);
+    bpt::free(device, actor_batch);
+    bpt::free(device, actor_training_buffers);
+    bpt::free(device, actor_buffers_eval);
+    bpt::free(device, actor_buffers);
+    bpt::free(device, observations_mean);
+    bpt::free(device, observations_std);
+}
+
