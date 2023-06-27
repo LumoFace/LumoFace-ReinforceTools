@@ -162,4 +162,60 @@ void train(){
     std::cout << "Total: " << sizeof(actor_critic) + sizeof(off_policy_runner) + sizeof(critic_batch) + sizeof(critic_training_buffers) + sizeof(critic_buffers) + sizeof(actor_batch) + sizeof(actor_training_buffers) + sizeof(actor_buffers) << std::endl;
 #endif
 
-    for(int step_i = 0; step_i
+    for(int step_i = 0; step_i < N_STEPS; step_i+=OFF_POLICY_RUNNER_SPEC::N_ENVIRONMENTS){
+        bpt::step(device, off_policy_runner, actor_critic.actor, actor_buffers_eval, rng);
+#ifdef BACKPROP_TOOLS_DEPLOYMENT_ARDUINO
+        if(step_i % 100 == 0){
+            Serial.printf("step: %d\n", step_i);
+#else
+        if(step_i % 1000 == 0){
+            auto current_time = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed_seconds = current_time - start_time;
+            std::cout << "step_i: " << step_i << " " << elapsed_seconds.count() << "s" << std::endl;
+#endif
+
+        }
+        if(step_i > N_WARMUP_STEPS){
+
+            for(int critic_i = 0; critic_i < 2; critic_i++){
+                bpt::target_action_noise(device, actor_critic, critic_training_buffers.target_next_action_noise, rng);
+                bpt::gather_batch(device, off_policy_runner, critic_batch, rng);
+                bpt::train_critic(device, actor_critic, critic_i == 0 ? actor_critic.critic_1 : actor_critic.critic_2, critic_batch, optimizer, actor_buffers, critic_buffers, critic_training_buffers);
+            }
+
+            if(step_i % 2 == 0){
+                {
+                    bpt::gather_batch(device, off_policy_runner, actor_batch, rng);
+                    bpt::train_actor(device, actor_critic, actor_batch, optimizer, actor_buffers, critic_buffers, actor_training_buffers);
+                }
+
+                bpt::update_critic_targets(device, actor_critic);
+                bpt::update_actor_target(device, actor_critic);
+            }
+        }
+#ifndef BACKPROP_TOOLS_DISABLE_EVALUATION
+        if(step_i % EVALUATION_INTERVAL == 0){
+            auto result = bpt::evaluate(device, envs[0], ui, actor_critic.actor, bpt::rl::utils::evaluation::Specification<10, ENVIRONMENT_STEP_LIMIT>(), observations_mean, observations_std, rng);
+            if(N_EVALUATIONS > 0){
+                evaluation_returns[(step_i / EVALUATION_INTERVAL) % N_EVALUATIONS] = result.mean;
+            }
+#ifdef BACKPROP_TOOLS_DEPLOYMENT_ARDUINO
+            Serial.printf("mean return: %f\n", result.mean);
+#else
+            std::cout << "Mean return: " << result.mean << std::endl;
+#endif
+        }
+#endif
+    }
+#ifndef BACKPROP_TOOLS_DEPLOYMENT_ARDUINO
+    {
+        auto current_time = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed_seconds = current_time - start_time;
+        std::cout << "total time: " << elapsed_seconds.count() << "s" << std::endl;
+    }
+#endif
+    bpt::free(device, actor_critic);
+    bpt::free(device, off_policy_runner);
+    bpt::free(device, critic_batch);
+    bpt::free(device, critic_training_buffers);
+    bpt::free(device, critic_buffers
