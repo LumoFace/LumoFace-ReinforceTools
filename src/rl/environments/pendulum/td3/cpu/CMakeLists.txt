@@ -51,4 +51,18 @@ BACKPROP_TOOLS_INSTALL(rl_environments_pendulum_td3_training_blas_benchmark)
 endif()
 
 # RL Algorithm td3 test full training tensorboard
-if(BACKPROP_TOOLS_ENABLE_TEN
+if(BACKPROP_TOOLS_ENABLE_TENSORBOARD AND BACKPROP_TOOLS_BACKEND_ENABLE_BLAS)
+add_executable(
+        rl_environments_pendulum_td3_training_blas_tensorboard
+        standalone.cpp
+)
+target_link_libraries(
+        rl_environments_pendulum_td3_training_blas_tensorboard
+        PRIVATE
+        backprop_tools
+        tensorboard_logger
+)
+BACKPROP_TOOLS_ADD_DEFINITIONS(rl_environments_pendulum_td3_training_blas_tensorboard)
+BACKPROP_TOOLS_TARGET_LINK_BLAS(rl_environments_pendulum_td3_training_blas_tensorboard)
+BACKPROP_TOOLS_INSTALL(rl_environments_pendulum_td3_training_blas_tensorboard)
+endif()
