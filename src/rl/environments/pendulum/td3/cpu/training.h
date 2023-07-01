@@ -156,4 +156,50 @@ void run(){
         bpt::set_step(device, device.logger, step_i);
 #ifdef BACKPROP_TOOLS_TEST_RL_ALGORITHMS_TD3_FULL_TRAINING_OUTPUT_PLOTS
         if(step_i % 20 == 0){
-            plot_policy_and_value_function<T, ENVIRONMENT, decltype(actor_critic.actor), decltype(actor_critic.critic_1)>(actor_c
+            plot_policy_and_value_function<T, ENVIRONMENT, decltype(actor_critic.actor), decltype(actor_critic.critic_1)>(actor_critic.actor, actor_critic.critic_1, std::string("full_training"), step_i);
+        }
+#endif
+        bpt::step(device, off_policy_runner, actor_critic.actor, actor_buffers_eval, rng);
+#ifdef BACKPROP_TOOLS_TEST_RL_ALGORITHMS_TD3_FULL_TRAINING_EVALUATE_VISUALLY
+        bpt::set_state(ui, off_policy_runner.state);
+#endif
+
+        if(step_i > N_WARMUP_STEPS){
+            if(step_i % 1000 == 0){
+                auto current_time = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double> elapsed_seconds = current_time - start_time;
+                std::cout << "step_i: " << step_i << " " << elapsed_seconds.count() << "s" << std::endl;
+            }
+
+            for(int critic_i = 0; critic_i < 2; critic_i++){
+                bpt::target_action_noise(device, actor_critic, critic_training_buffers.target_next_action_noise, rng);
+                bpt::gather_batch(device, off_policy_runner, critic_batch, rng);
+                bpt::train_critic(device, actor_critic, critic_i == 0 ? actor_critic.critic_1 : actor_critic.critic_2, critic_batch, optimizer, actor_buffers[critic_i], critic_buffers[critic_i], critic_training_buffers);
+            }
+
+//            T critic_1_loss = bpt::train_critic(device, actor_critic, actor_critic.critic_1, off_policy_runner.replay_buffer, rng);
+//            bpt::train_critic(device, actor_critic, actor_critic.critic_2, off_policy_runner.replay_buffer, rng);
+//            std::cout << "Critic 1 loss: " << critic_1_loss << std::endl;
+            if(step_i % 2 == 0){
+                {
+                    bpt::gather_batch(device, off_policy_runner, actor_batch, rng);
+                    bpt::train_actor(device, actor_critic, actor_batch, optimizer, actor_buffers[0], critic_buffers[0], actor_training_buffers);
+                }
+
+                bpt::update_critic_targets(device, actor_critic);
+                bpt::update_actor_target(device, actor_critic);
+            }
+        }
+#ifndef BACKPROP_TOOLS_RL_ENVIRONMENTS_PENDULUM_DISABLE_EVALUATION
+        if(step_i % 1000 == 0){
+//            auto result = bpt::evaluate(device, envs[0], ui, actor_critic.actor, bpt::rl::utils::evaluation::Specification<1, EPISODE_STEP_LIMIT>(), rng, true);
+            auto result = bpt::evaluate(device, envs[0], ui, actor_critic.actor, bpt::rl::utils::evaluation::Specification<10, EPISODE_STEP_LIMIT>(), observations_mean, observations_std, rng);
+            std::cout << "Mean return: " << result.mean << std::endl;
+            bpt::add_scalar(device, device.logger, "mean_return", result.mean);
+//            if(step_i >= 6000){
+//                ASSERT_GT(mean_return, -1000);
+//            }
+//            if(step_i >= 14000){
+//                ASSERT_GT(mean_return, -400);
+//            }
+
