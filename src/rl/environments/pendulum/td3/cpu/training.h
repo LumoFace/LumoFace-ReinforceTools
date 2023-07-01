@@ -100,3 +100,60 @@ ACTOR_CRITIC_TYPE actor_critic;
 const T STATE_TOLERANCE = 0.00001;
 constexpr int N_WARMUP_STEPS = ACTOR_CRITIC_TYPE::SPEC::PARAMETERS::ACTOR_BATCH_SIZE;
 static_assert(ACTOR_CRITIC_TYPE::SPEC::PARAMETERS::ACTOR_BATCH_SIZE == ACTOR_CRITIC_TYPE::SPEC::PARAMETERS::CRITIC_BATCH_SIZE);
+
+void run(){
+#ifdef BACKPROP_TOOLS_TEST_RL_ALGORITHMS_TD3_FULL_TRAINING_EVALUATE_VISUALLY
+    UI ui;
+#endif
+    DEVICE::SPEC::LOGGING logger;
+    DEVICE device;
+    device.logger = &logger;
+
+    OPTIMIZER optimizer;
+
+    auto rng = bpt::random::default_engine(typename DEVICE::SPEC::RANDOM{}, 4);
+    bpt::malloc(device, actor_critic);
+    bpt::init(device, actor_critic, optimizer, rng);
+
+    bool ui = false;
+
+    bpt::construct(device, device.logger);
+
+    bpt::malloc(device, off_policy_runner);
+    ENVIRONMENT envs[decltype(off_policy_runner)::N_ENVIRONMENTS];
+    bpt::init(device, off_policy_runner, envs);
+
+//    bpt::rl::components::off_policy_runner::Batch<bpt::rl::components::off_policy_runner::BatchSpecification<decltype(off_policy_runner)::SPEC, ACTOR_CRITIC_TYPE::SPEC::PARAMETERS::CRITIC_BATCH_SIZE>> critic_batch;
+    OFF_POLICY_RUNNER_TYPE::Batch<TD3_PARAMETERS::CRITIC_BATCH_SIZE> critic_batch;
+    bpt::rl::algorithms::td3::CriticTrainingBuffers<ACTOR_CRITIC_TYPE::SPEC> critic_training_buffers;
+    CRITIC_NETWORK_TYPE::BuffersForwardBackward<ACTOR_CRITIC_TYPE::SPEC::PARAMETERS::CRITIC_BATCH_SIZE> critic_buffers[2];
+    bpt::malloc(device, critic_batch);
+    bpt::malloc(device, critic_training_buffers);
+    bpt::malloc(device, critic_buffers[0]);
+    bpt::malloc(device, critic_buffers[1]);
+
+    OFF_POLICY_RUNNER_TYPE::Batch<TD3_PARAMETERS::ACTOR_BATCH_SIZE> actor_batch;
+    bpt::rl::algorithms::td3::ActorTrainingBuffers<ACTOR_CRITIC_TYPE::SPEC> actor_training_buffers;
+    ACTOR_NETWORK_TYPE::Buffers<ACTOR_CRITIC_TYPE::SPEC::PARAMETERS::ACTOR_BATCH_SIZE> actor_buffers[2];
+    ACTOR_NETWORK_TYPE::Buffers<OFF_POLICY_RUNNER_SPEC::N_ENVIRONMENTS> actor_buffers_eval;
+    bpt::malloc(device, actor_batch);
+    bpt::malloc(device, actor_training_buffers);
+    bpt::malloc(device, actor_buffers_eval);
+    bpt::malloc(device, actor_buffers[0]);
+    bpt::malloc(device, actor_buffers[1]);
+
+    bpt::MatrixDynamic<bpt::matrix::Specification<T, TI, 1, ENVIRONMENT::OBSERVATION_DIM>> observations_mean;
+    bpt::MatrixDynamic<bpt::matrix::Specification<T, TI, 1, ENVIRONMENT::OBSERVATION_DIM>> observations_std;
+    bpt::malloc(device, observations_mean);
+    bpt::malloc(device, observations_std);
+    bpt::set_all(device, observations_mean, 0);
+    bpt::set_all(device, observations_std, 1);
+
+
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    for(int step_i = 0; step_i < STEP_LIMIT; step_i+=OFF_POLICY_RUNNER_SPEC::N_ENVIRONMENTS){
+        bpt::set_step(device, device.logger, step_i);
+#ifdef BACKPROP_TOOLS_TEST_RL_ALGORITHMS_TD3_FULL_TRAINING_OUTPUT_PLOTS
+        if(step_i % 20 == 0){
+            plot_policy_and_value_function<T, ENVIRONMENT, decltype(actor_critic.actor), decltype(actor_critic.critic_1)>(actor_c
