@@ -203,3 +203,33 @@ void run(){
 //                ASSERT_GT(mean_return, -400);
 //            }
 
+//#ifdef BACKPROP_TOOLS_TEST_RL_ALGORITHMS_TD3_FULL_TRAINING_OUTPUT_PLOTS
+//            plot_policy_and_value_function<T, ENVIRONMENT, ACTOR_CRITIC_TYPE::ACTOR_NETWORK_TYPE, ACTOR_CRITIC_TYPE::CRITIC_NETWORK_TYPE>(actor_critic.actor, actor_critic.critic_1, std::string("full_training"), step_i);
+//#endif
+#ifdef BACKPROP_TOOLS_TEST_RL_ALGORITHMS_TD3_FULL_TRAINING_EVALUATE_VISUALLY
+            //            for(int evaluation_i = 0; evaluation_i < 10; evaluation_i++){
+//                ENVIRONMENT::State initial_state;
+//                bpt::sample_initial_state(env, initial_state, rng);
+//                bpt::evaluate_visual<ENVIRONMENT, UI, ACTOR_CRITIC_TYPE::ACTOR_NETWORK_TYPE, EPISODE_STEP_LIMIT, 5>(env, ui, actor_critic.actor, initial_state);
+//            }
+#endif
+        }
+#endif
+    }
+    {
+        auto current_time = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed_seconds = current_time - start_time;
+        std::cout << "total time: " << elapsed_seconds.count() << "s" << std::endl;
+    }
+    bpt::free(device, critic_batch);
+    bpt::free(device, critic_training_buffers);
+    bpt::free(device, actor_batch);
+    bpt::free(device, actor_training_buffers);
+    bpt::free(device, off_policy_runner);
+    bpt::free(device, actor_critic);
+    bpt::free(device, observations_mean);
+    bpt::free(device, observations_std);
+
+    bpt::destruct(device, device.logger);
+}
+
