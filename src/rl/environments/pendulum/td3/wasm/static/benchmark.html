@@ -65,3 +65,29 @@
             await sendMessageToWorker("destroy_training_state");
             appendToTerminal("Training took " + (end - start) + " milliseconds");
         }
+
+    });
+    if (window.Worker) {
+        try {
+            async_main();
+        } catch (error) {
+            console.error("Error running main", error);
+        }
+    } else {
+        console.log('Web Workers are not supported in your browser.');
+    }
+</script>
+
+<div class="container">
+    <div class="controls-container" style="margin-top: 20px;">
+        <input class="fancy-button" type="button" value="Copy to clipboard" id="copy-to-clipboard-button">
+    </div>
+    <div id="terminal-container" class="terminal-container">
+        <div id="terminal">
+            <pre id="terminal-output"></pre>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
