@@ -53,4 +53,33 @@ int proxy_get_episode(TRAINING_STATE* ts, int env_index){
 EMSCRIPTEN_KEEPALIVE
 double proxy_get_episode_return(TRAINING_STATE* ts, int env_index, int episode_i){
     static_assert(TRAINING_STATE::TRAINING_CONFIG::OFF_POLICY_RUNNER_SPEC::N_ENVIRONMENTS == 1);
-    if(env_index < TRAINING_STATE::TRAINING_CONFIG::OFF_POLICY_RUNNER_SPEC::N_ENVIRONMENTS && episode_i < 
+    if(env_index < TRAINING_STATE::TRAINING_CONFIG::OFF_POLICY_RUNNER_SPEC::N_ENVIRONMENTS && episode_i < TRAINING_STATE::TRAINING_CONFIG::OFF_POLICY_RUNNER_SPEC::EPISODE_STATS_BUFFER_SIZE){
+        return get(ts->off_policy_runner.episode_stats[env_index].returns, episode_i, 0);
+    }
+    else{
+        return -1337;
+    }
+}
+
+EMSCRIPTEN_KEEPALIVE
+    int proxy_get_evaluation_count(){
+#ifdef BACKPROP_TOOLS_ENABLE_EVALUATION
+        return TRAINING_STATE::N_EVALUATIONS;
+#endif
+        return 0;
+    }
+
+EMSCRIPTEN_KEEPALIVE
+    double proxy_get_evaluation_return(TRAINING_STATE* ts, int index){
+#ifdef BACKPROP_TOOLS_ENABLE_EVALUATION
+        return ts->evaluation_returns[index];
+#endif
+        return 0;
+    }
+
+EMSCRIPTEN_KEEPALIVE
+    void proxy_destroy_training_state(TRAINING_STATE* ts){
+        training_destroy(*ts);
+        delete ts;
+    }
+}
