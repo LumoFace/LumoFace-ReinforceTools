@@ -14,4 +14,6 @@ Github actions test
 ```
 docker run -it --rm ubuntu
 apt update && apt install -y git git-lfs && git lfs install && git clone --recursive https://github.com/BackpropTools/BackpropTools
-apt install -y build-essential cmake libhdf5-dev 
+apt install -y build-essential cmake libhdf5-dev libboost-dev libboost-system-dev libboost-serialization-dev libprotobuf-dev
+cd BackpropTools
+```
