@@ -116,4 +116,33 @@ TEST(BACKPROP_TOOLS_CONTAINER_PERSIST_CODE_LOAD, TEST_MLP_EVALUATE){
     using DEVICE = bpt::devices::DefaultCPU;
     using DTYPE = float;
     constexpr typename DEVICE::index_t BATCH_SIZE = 10;
-    DEVICE d
+    DEVICE device;
+    auto rng = bpt::random::default_engine(DEVICE::SPEC::RANDOM());
+    using STRUCTURE_SPEC = bpt::nn_models::mlp::StructureSpecification<DTYPE, typename DEVICE::index_t, 13, 4, 3, 64, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::nn::activation_functions::ActivationFunction::IDENTITY, 1, bpt::MatrixDynamicTag, true, bpt::matrix::layouts::RowMajorAlignment<typename DEVICE::index_t, 1>>;
+    using SPEC = bpt::nn_models::mlp::InferenceSpecification<STRUCTURE_SPEC>;
+    bpt::nn_models::mlp::NeuralNetwork<SPEC> mlp;
+    bpt::malloc(device, mlp);
+    bpt::init_weights(device, mlp, rng);
+
+    bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, typename DEVICE::index_t, BATCH_SIZE, SPEC::STRUCTURE_SPEC::INPUT_DIM>> input;
+    bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, typename DEVICE::index_t, BATCH_SIZE, SPEC::STRUCTURE_SPEC::OUTPUT_DIM>> output_orig, output_loaded;
+    bpt::malloc(device, input);
+    bpt::malloc(device, output_orig);
+    bpt::malloc(device, output_loaded);
+    bpt::randn(device, input, rng);
+    bpt::evaluate(device, mlp, input, output_orig);
+    bpt::evaluate(device, mlp_1::mlp, input, output_loaded);
+    bpt::print(device, output_orig);
+
+    auto output = bpt::save(device, input, "input", const_declaration);
+    output += bpt::save(device, output_orig, "expected_output", const_declaration);
+
+    std::filesystem::create_directories("data");
+    std::ofstream file;
+    file.open ("data/test_backprop_tools_nn_models_mlp_evaluation.h");
+    file << output;
+    file.close();
+
+    auto abs_diff = bpt::abs_diff(device, output_orig, output_loaded);
+    ASSERT_FLOAT_EQ(0, abs_diff);
+}
