@@ -81,4 +81,11 @@ TEST(BACKPROP_TOOLS_CONTAINER_PERSIST_CODE_STORE, TEST_MLP){
     bpt::init_weights(device, mlp, rng);
     auto output = bpt::save(device, mlp, "mlp_1", const_declaration);
     std::cout << "output: " << output << std::endl;
-  
+    std::filesystem::create_directories("data");
+    std::ofstream file;
+    file.open ("data/test_backprop_tools_nn_models_mlp_persist_code.h");
+    file << output;
+    file.close();
+
+    ASSERT_TRUE(true);
+}
