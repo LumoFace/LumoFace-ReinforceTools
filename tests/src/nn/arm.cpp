@@ -45,4 +45,29 @@ void test_mlp_evaluate() {
     bpt::evaluate(device_arm, mlp, input, output_arm);
     bpt::print(device, output_orig);
 
-    auto abs_diff = bpt::abs_diff(device, output_or
+    auto abs_diff = bpt::abs_diff(device, output_orig, output_arm);
+
+    ASSERT_LT(abs_diff, 1e-5);
+}TEST(BACKPROP_TOOLS_NN_ARM, TEST_MLP_EVALUATE) {
+    test_mlp_evaluate<double, 13, 4, 3, 64, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::nn::activation_functions::ActivationFunction::IDENTITY, 1>();
+    test_mlp_evaluate<double, 1, 4, 3, 64, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::nn::activation_functions::ActivationFunction::IDENTITY, 1>();
+    test_mlp_evaluate<double, 13, 1, 3, 64, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::nn::activation_functions::ActivationFunction::IDENTITY, 1>();
+    test_mlp_evaluate<double, 1, 1, 2, 1, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::nn::activation_functions::ActivationFunction::IDENTITY, 1>();
+    test_mlp_evaluate<double, 13, 4, 2, 64, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::nn::activation_functions::ActivationFunction::IDENTITY, 1>();
+    test_mlp_evaluate<double, 13, 4, 3, 1, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::nn::activation_functions::ActivationFunction::IDENTITY, 1>();
+    test_mlp_evaluate<double, 13, 4, 30, 64, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::nn::activation_functions::ActivationFunction::IDENTITY, 1>();
+    test_mlp_evaluate<double, 13, 4, 3, 64, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::nn::activation_functions::ActivationFunction::IDENTITY, 1>();
+    test_mlp_evaluate<double, 13, 4, 3, 64, bpt::nn::activation_functions::ActivationFunction::IDENTITY, bpt::nn::activation_functions::ActivationFunction::RELU, 1>();
+    test_mlp_evaluate<double, 13, 4, 3, 64, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::nn::activation_functions::ActivationFunction::RELU, 1>();
+}
+
+template <typename DTYPE, auto INPUT_DIM, auto OUTPUT_DIM, auto N_HIDDEN_LAYERS, auto HIDDEN_DIM, bpt::nn::activation_functions::ActivationFunction HIDDEN_ACTIVATION_FUNCTION, bpt::nn::activation_functions::ActivationFunction ACTIVATION_FUNCTION, auto BATCH_SIZE>
+void test_mlp_forward() {
+    using DEVICE = bpt::devices::DefaultCPU;
+    using DEVICE_ARM = bpt::devices::DefaultARM;
+    DEVICE device;
+    DEVICE_ARM device_arm;
+    auto rng = bpt::random::default_engine(DEVICE::SPEC::RANDOM());
+    using STRUCTURE_SPEC = bpt::nn_models::mlp::StructureSpecification<DTYPE, typename DEVICE::index_t, INPUT_DIM, OUTPUT_DIM, N_HIDDEN_LAYERS, HIDDEN_DIM, HIDDEN_ACTIVATION_FUNCTION, ACTIVATION_FUNCTION, 1,  bpt::MatrixDynamicTag, true, bpt::matrix::layouts::RowMajorAlignment<typename DEVICE::index_t, 1>>;
+    using SPEC = bpt::nn_models::mlp::BackwardGradientSpecification<STRUCTURE_SPEC>;
+    using TYPE = bpt::nn_models::mlp::NeuralNetworkBackwa
