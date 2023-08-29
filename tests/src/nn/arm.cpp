@@ -105,4 +105,5 @@ TEST(BACKPROP_TOOLS_NN_ARM, TEST_MLP_FORWARD){
     test_mlp_forward<double, 13, 4, 30, 64, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::nn::activation_functions::ActivationFunction::IDENTITY, 1>();
     test_mlp_forward<double, 13, 4, 3, 64, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::nn::activation_functions::ActivationFunction::IDENTITY, 1>();
     test_mlp_forward<double, 13, 4, 3, 64, bpt::nn::activation_functions::ActivationFunction::IDENTITY, bpt::nn::activation_functions::ActivationFunction::RELU, 1>();
-    test_mlp_forward<double, 13, 4, 3, 64, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::n
+    test_mlp_forward<double, 13, 4, 3, 64, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::nn::activation_functions::ActivationFunction::RELU, 1>();
+}
