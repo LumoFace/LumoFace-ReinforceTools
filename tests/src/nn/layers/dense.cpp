@@ -55,4 +55,22 @@ TEST(BACKPROP_TOOLS_NN_LAYERS_DENSE, COPY_TIMING) {
     {
         auto start = std::chrono::high_resolution_clock::now();
         for(TI i = 0; i < ITERATIONS; i++){
-            std::memcpy(o
+            std::memcpy(output._data, input._data, decltype(input)::SPEC::SIZE_BYTES);
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        std::cout << "memcpy: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << std::endl;
+    }
+    {
+        auto start = std::chrono::high_resolution_clock::now();
+        for(TI i = 0; i < ITERATIONS; i++){
+            for(TI i = 0; i < decltype(input)::SPEC::SIZE; i++){
+                output._data[i] = input._data[i];
+            }
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        std::cout << "memcpy: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << std::endl;
+    }
+    bpt::free(device, input);
+    bpt::free(device, output);
+}
+
