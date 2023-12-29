@@ -53,4 +53,57 @@ TEST(BACKPROP_TOOLS_NN_MODELS_MLP_VARI, TEST){
     using T = float;
     using TI = typename DEVICE::index_t;
 
-    using MLP_STRUCTURE_SPEC = bpt::nn_models::mlp::StructureSpecification<T, TI, 5, 2,
+    using MLP_STRUCTURE_SPEC = bpt::nn_models::mlp::StructureSpecification<T, TI, 5, 2, 3, 10, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::nn::activation_functions::ActivationFunction::IDENTITY>;
+    using MLP_SPEC = bpt::nn_models::mlp::AdamSpecification<MLP_STRUCTURE_SPEC>;
+    using MLP = bpt::nn_models::mlp::NeuralNetworkAdam<MLP_SPEC>;
+
+    using OPTIMIZER_SPEC = bpt::nn::optimizers::adam::DefaultParametersTF<T>;
+    using OPTIMIZER = bpt::nn::optimizers::Adam<OPTIMIZER_SPEC>;
+
+    using LAYER_1_SPEC = bpt::nn::layers::dense::Specification<T, TI, 5, 10, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::nn::parameters::Adam>;
+    using LAYER_1 = bpt::nn::layers::dense::LayerBackwardGradient<LAYER_1_SPEC>;
+    using LAYER_2_SPEC = bpt::nn::layers::dense::Specification<T, TI, 10, 10, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::nn::parameters::Adam>;
+    using LAYER_2 = bpt::nn::layers::dense::LayerBackwardGradient<LAYER_2_SPEC>;
+    using LAYER_3_SPEC = bpt::nn::layers::dense::Specification<T, TI, 10, 2, bpt::nn::activation_functions::ActivationFunction::IDENTITY, bpt::nn::parameters::Adam>;
+    using LAYER_3 = bpt::nn::layers::dense::LayerBackwardGradient<LAYER_3_SPEC>;
+
+    using MLP_VARI = Module<LAYER_1, Module<LAYER_2, Module<LAYER_3>>>;
+
+
+    DEVICE device;
+    MLP mlp;
+    OPTIMIZER optimizer;
+    auto rng = bpt::random::default_engine(typename DEVICE::SPEC::RANDOM{}, 1);
+
+    LAYER_1 layer_1;
+    LAYER_2 layer_2;
+    LAYER_3 layer_3;
+
+    MLP_VARI mlp_vari;
+
+    bpt::malloc(device, mlp);
+    bpt::malloc(device, layer_1);
+    bpt::malloc(device, layer_2);
+    bpt::malloc(device, layer_3);
+
+    bpt::malloc(device, mlp_vari.content);
+    bpt::malloc(device, mlp_vari.next_module.content);
+    bpt::malloc(device, mlp_vari.next_module.next_module.content);
+
+    bpt::init_weights(device, mlp, rng);
+    bpt::copy(device, device, layer_1, mlp.input_layer);
+    bpt::copy(device, device, layer_2, mlp.hidden_layers[0]);
+    bpt::copy(device, device, layer_3, mlp.output_layer);
+
+    bpt::copy(device, device, mlp_vari.content, mlp.input_layer);
+    bpt::copy(device, device, mlp_vari.next_module.content, mlp.hidden_layers[0]);
+    bpt::copy(device, device, mlp_vari.next_module.next_module.content, mlp.output_layer);
+
+    bpt::MatrixDynamic<bpt::matrix::Specification<T, TI, 1, 5>> input;
+    bpt::MatrixDynamic<bpt::matrix::Specification<T, TI, 1, 10>> hidden_tick;
+    bpt::MatrixDynamic<bpt::matrix::Specification<T, TI, 1, 10>> hidden_tock;
+    bpt::MatrixDynamic<bpt::matrix::Specification<T, TI, 1, 2>> output_mlp;
+    bpt::MatrixDynamic<bpt::matrix::Specification<T, TI, 1, 2>> output_chain;
+    bpt::MatrixDynamic<bpt::matrix::Specification<T, TI, 1, 2>> output_mlp_vari;
+    bpt::malloc(device, input);
+  
