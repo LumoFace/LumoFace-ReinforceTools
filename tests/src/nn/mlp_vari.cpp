@@ -106,4 +106,28 @@ TEST(BACKPROP_TOOLS_NN_MODELS_MLP_VARI, TEST){
     bpt::MatrixDynamic<bpt::matrix::Specification<T, TI, 1, 2>> output_chain;
     bpt::MatrixDynamic<bpt::matrix::Specification<T, TI, 1, 2>> output_mlp_vari;
     bpt::malloc(device, input);
-  
+    bpt::malloc(device, hidden_tick);
+    bpt::malloc(device, hidden_tock);
+    bpt::malloc(device, output_mlp);
+    bpt::malloc(device, output_chain);
+    bpt::malloc(device, output_mlp_vari);
+
+    bpt::randn(device, input, rng);
+    bpt::print(device, input);
+
+//    bpt::forward(device, mlp, input, output_mlp);
+//    bpt::print(device, output_mlp);
+
+//    bpt::forward(device, layer_1, input, hidden_tick);
+//    bpt::forward(device, layer_2, hidden_tick, hidden_tock);
+//    bpt::forward(device, layer_3, hidden_tock, output_chain);
+//    bpt::print(device, output_chain);
+
+//    bpt::forward(device, mlp_vari.content                        , input, hidden_tick);
+//    bpt::forward(device, mlp_vari.next_module.content            , hidden_tick, hidden_tock);
+//    bpt::forward(device, mlp_vari.next_module.next_module.content, hidden_tock, output_mlp_vari);
+//    bpt::print(device, output_mlp_vari);
+
+    bpt::forward(device, mlp_vari, input, output_mlp_vari);
+    bpt::print(device, output_mlp_vari);
+}
