@@ -51,4 +51,37 @@ using DEVICE = NN_DEVICE;
 template <typename NetworkType>
 class NeuralNetworkTestLoadWeights : public NeuralNetworkTest {
 protected:
-    NeuralNetwork
+    NeuralNetworkTestLoadWeights(){
+        device.logger = &logger;
+        model_name = "model_1";
+        bpt::malloc(device, network);
+        bpt::malloc(device, network_buffers);
+        auto data_file = HighFive::File(DATA_FILE_PATH, HighFive::File::ReadOnly);
+        data_file.getDataSet("model_1/gradients/0/input_layer/weight").read(batch_0_input_layer_weights_grad);
+        data_file.getDataSet("model_1/gradients/0/input_layer/bias").read(batch_0_input_layer_biases_grad);
+        data_file.getDataSet("model_1/gradients/0/hidden_layer_0/weight").read(batch_0_hidden_layer_0_weights_grad);
+        data_file.getDataSet("model_1/gradients/0/hidden_layer_0/bias").read(batch_0_hidden_layer_0_biases_grad);
+        data_file.getDataSet("model_1/gradients/0/output_layer/weight").read(batch_0_output_layer_weights_grad);
+        data_file.getDataSet("model_1/gradients/0/output_layer/bias").read(batch_0_output_layer_biases_grad);
+        this->reset();
+        DTYPE input[INPUT_DIM];
+        DTYPE output[OUTPUT_DIM];
+        standardise<DTYPE, INPUT_DIM>(X_train[0].data(), X_mean.data(), X_std.data(), input);
+        standardise<DTYPE, OUTPUT_DIM>(Y_train[0].data(), Y_mean.data(), Y_std.data(), output);
+        bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, INPUT_DIM, bpt::matrix::layouts::RowMajorAlignment<NN_DEVICE::index_t>>> input_matrix;
+        input_matrix._data = input;
+        bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, OUTPUT_DIM, bpt::matrix::layouts::RowMajorAlignment<NN_DEVICE::index_t>>> output_matrix;
+        output_matrix._data = output;
+        bpt::forward(device, network, input_matrix);
+//        bpt::forward(device, network, input);
+        DTYPE d_loss_d_output[OUTPUT_DIM];
+        bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, OUTPUT_DIM, bpt::matrix::layouts::RowMajorAlignment<NN_DEVICE::index_t>>> d_loss_d_output_matrix;
+        d_loss_d_output_matrix._data = d_loss_d_output;
+        bpt::nn::loss_functions::mse::gradient(device, network.output_layer.output, output_matrix, d_loss_d_output_matrix);
+//        bpt::nn::loss_functions::d_mse_d_x<NN_DEVICE, DTYPE, OUTPUT_DIM, 1>(device, network.output_layer.output.data, output, d_loss_d_output);
+        DTYPE d_input[INPUT_DIM];
+        bpt::zero_gradient(device, network);
+//        bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, OUTPUT_DIM>> d_loss_d_output_matrix = {d_loss_d_output};
+        bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, INPUT_DIM, bpt::matrix::layouts::RowMajorAlignment<NN_DEVICE::index_t>>> d_input_matrix;
+        d_input_matrix._data = d_input;
+        b
