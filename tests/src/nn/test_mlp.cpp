@@ -84,4 +84,49 @@ protected:
 //        bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, OUTPUT_DIM>> d_loss_d_output_matrix = {d_loss_d_output};
         bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, INPUT_DIM, bpt::matrix::layouts::RowMajorAlignment<NN_DEVICE::index_t>>> d_input_matrix;
         d_input_matrix._data = d_input;
-        b
+        bpt::backward(device, network, input_matrix, d_loss_d_output_matrix, d_input_matrix, network_buffers);
+//        bpt::backward(device, network, input, d_loss_d_output, d_input);
+    }
+    void reset(){
+
+        auto data_file = HighFive::File(DATA_FILE_PATH, HighFive::File::ReadOnly);
+        data_file.getDataSet(model_name + "/init/input_layer/weight").read(input_layer_weights);
+        data_file.getDataSet(model_name + "/init/input_layer/bias").read(input_layer_biases);
+        data_file.getDataSet(model_name + "/init/hidden_layer_0/weight").read(hidden_layer_0_weights);
+        data_file.getDataSet(model_name + "/init/hidden_layer_0/bias").read(hidden_layer_0_biases);
+        data_file.getDataSet(model_name + "/init/output_layer/weight").read(output_layer_weights);
+        data_file.getDataSet(model_name + "/init/output_layer/bias").read(output_layer_biases);
+        bpt::load(device, network.input_layer.weights.parameters, input_layer_weights);
+        bpt::assign(device, network.input_layer.biases.parameters, input_layer_biases.data());
+        bpt::load(device, network.hidden_layers[0].weights.parameters, hidden_layer_0_weights);
+        bpt::assign(device, network.hidden_layers[0].biases.parameters, hidden_layer_0_biases.data());
+        bpt::load(device, network.output_layer.weights.parameters, output_layer_weights);
+        bpt::assign(device, network.output_layer.biases.parameters, output_layer_biases.data());
+    }
+
+    typename NN_DEVICE::SPEC::LOGGING logger;
+    NN_DEVICE device;
+    NetworkType network;
+    typename NetworkType::template Buffers<> network_buffers;
+    std::vector<std::vector<DTYPE>> input_layer_weights;
+    std::vector<DTYPE> input_layer_biases;
+    std::vector<std::vector<DTYPE>> hidden_layer_0_weights;
+    std::vector<DTYPE> hidden_layer_0_biases;
+    std::vector<std::vector<DTYPE>> output_layer_weights;
+    std::vector<DTYPE> output_layer_biases;
+    std::vector<std::vector<DTYPE>> batch_0_input_layer_weights_grad;
+    std::vector<DTYPE> batch_0_input_layer_biases_grad;
+    std::vector<std::vector<DTYPE>> batch_0_hidden_layer_0_weights_grad;
+    std::vector<DTYPE> batch_0_hidden_layer_0_biases_grad;
+    std::vector<std::vector<DTYPE>> batch_0_output_layer_weights_grad;
+    std::vector<DTYPE> batch_0_output_layer_biases_grad;
+};
+
+constexpr DTYPE BACKWARD_PASS_GRADIENT_TOLERANCE (1e-8);
+#ifndef SKIP_BACKPROP_TESTS
+using BACKPROP_TOOLS_NN_MLP_BACKWARD_PASS = NeuralNetworkTestLoadWeights<NetworkType_1>;
+#ifndef SKIP_TESTS
+TEST_F(BACKPROP_TOOLS_NN_MLP_BACKWARD_PASS, input_layer_weights) {
+    DTYPE out = abs_diff_matrix(
+            network.input_layer.weights.gradient,
+            batch_0_input_laye
