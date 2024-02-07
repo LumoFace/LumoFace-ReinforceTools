@@ -129,4 +129,82 @@ using BACKPROP_TOOLS_NN_MLP_BACKWARD_PASS = NeuralNetworkTestLoadWeights<Network
 TEST_F(BACKPROP_TOOLS_NN_MLP_BACKWARD_PASS, input_layer_weights) {
     DTYPE out = abs_diff_matrix(
             network.input_layer.weights.gradient,
-            batch_0_input_laye
+            batch_0_input_layer_weights_grad
+    );
+    std::cout << "input_layer_weights diff: " << out << std::endl;
+    ASSERT_LT(out, BACKWARD_PASS_GRADIENT_TOLERANCE * LAYER_1_DIM * INPUT_DIM);
+}
+#endif
+
+#ifndef SKIP_TESTS
+TEST_F(BACKPROP_TOOLS_NN_MLP_BACKWARD_PASS, input_layer_biases) {
+    DTYPE out = abs_diff_matrix(
+            network.input_layer.biases.gradient,
+            batch_0_input_layer_biases_grad.data()
+    );
+    std::cout << "input_layer_biases diff: " << out << std::endl;
+    ASSERT_LT(out, BACKWARD_PASS_GRADIENT_TOLERANCE * LAYER_1_DIM);
+}
+#endif
+
+#ifndef SKIP_TESTS
+TEST_F(BACKPROP_TOOLS_NN_MLP_BACKWARD_PASS, hidden_layer_0_weights) {
+    DTYPE out = abs_diff_matrix(
+            network.hidden_layers[0].weights.gradient,
+            batch_0_hidden_layer_0_weights_grad
+    );
+    std::cout << "hidden_layer_0_weights diff: " << out << std::endl;
+    ASSERT_LT(out, BACKWARD_PASS_GRADIENT_TOLERANCE * LAYER_2_DIM * LAYER_1_DIM);
+}
+#endif
+
+#ifndef SKIP_TESTS
+TEST_F(BACKPROP_TOOLS_NN_MLP_BACKWARD_PASS, hidden_layer_0_biases) {
+    DTYPE out = abs_diff_matrix(
+            network.hidden_layers[0].biases.gradient,
+            batch_0_hidden_layer_0_biases_grad.data()
+    );
+    std::cout << "hidden_layer_0_biases diff: " << out << std::endl;
+    ASSERT_LT(out, BACKWARD_PASS_GRADIENT_TOLERANCE * LAYER_2_DIM);
+}
+#endif
+
+#ifndef SKIP_TESTS
+TEST_F(BACKPROP_TOOLS_NN_MLP_BACKWARD_PASS, output_layer_weights) {
+    DTYPE out = abs_diff_matrix(
+            network.output_layer.weights.gradient,
+            batch_0_output_layer_weights_grad
+    );
+    std::cout << "output_layer_weights diff: " << out << std::endl;
+    ASSERT_LT(out, BACKWARD_PASS_GRADIENT_TOLERANCE * OUTPUT_DIM * LAYER_2_DIM);
+}
+#endif
+
+#ifndef SKIP_TESTS
+TEST_F(BACKPROP_TOOLS_NN_MLP_BACKWARD_PASS, output_layer_biases) {
+    DTYPE out = abs_diff_matrix(
+            network.output_layer.biases.gradient,
+            batch_0_output_layer_biases_grad.data()
+    );
+    std::cout << "output_layer_biases diff: " << out << std::endl;
+    ASSERT_LT(out, BACKWARD_PASS_GRADIENT_TOLERANCE * OUTPUT_DIM);
+}
+#endif
+#endif
+
+
+#ifndef SKIP_ADAM_TESTS
+typedef BACKPROP_TOOLS_NN_MLP_BACKWARD_PASS BACKPROP_TOOLS_NN_MLP_ADAM_UPDATE;
+#ifndef SKIP_TESTS
+TEST_F(BACKPROP_TOOLS_NN_MLP_ADAM_UPDATE, AdamUpdate) {
+    this->reset();
+    bpt::nn::optimizers::Adam<bpt::nn::optimizers::adam::DefaultParametersTF<DTYPE>> optimizer;
+
+    auto data_file = HighFive::File(DATA_FILE_PATH, HighFive::File::ReadOnly);
+    std::vector<std::vector<DTYPE>> batch_0_input_layer_weights;
+    std::vector<DTYPE> batch_0_input_layer_biases;
+    std::vector<std::vector<DTYPE>> batch_0_hidden_layer_0_weights;
+    std::vector<DTYPE> batch_0_hidden_layer_0_biases;
+    std::vector<std::vector<DTYPE>> batch_0_output_layer_weights;
+    std::vector<DTYPE> batch_0_output_layer_biases;
+    data_file.getDataSet("mo
