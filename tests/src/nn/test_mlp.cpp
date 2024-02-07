@@ -207,4 +207,47 @@ TEST_F(BACKPROP_TOOLS_NN_MLP_ADAM_UPDATE, AdamUpdate) {
     std::vector<DTYPE> batch_0_hidden_layer_0_biases;
     std::vector<std::vector<DTYPE>> batch_0_output_layer_weights;
     std::vector<DTYPE> batch_0_output_layer_biases;
-    data_file.getDataSet("mo
+    data_file.getDataSet("model_1/weights/0/input_layer/weight").read(batch_0_input_layer_weights);
+    data_file.getDataSet("model_1/weights/0/input_layer/bias").read(batch_0_input_layer_biases);
+    data_file.getDataSet("model_1/weights/0/hidden_layer_0/weight").read(batch_0_hidden_layer_0_weights);
+    data_file.getDataSet("model_1/weights/0/hidden_layer_0/bias").read(batch_0_hidden_layer_0_biases);
+    data_file.getDataSet("model_1/weights/0/output_layer/weight").read(batch_0_output_layer_weights);
+    data_file.getDataSet("model_1/weights/0/output_layer/bias").read(batch_0_output_layer_biases);
+    DTYPE input[INPUT_DIM];
+    DTYPE output[OUTPUT_DIM];
+    standardise<DTYPE, INPUT_DIM>(&X_train[0][0], &X_mean[0], &X_std[0], input);
+    standardise<DTYPE, OUTPUT_DIM>(&Y_train[0][0], &Y_mean[0], &Y_std[0], output);
+    bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, INPUT_DIM, bpt::matrix::layouts::RowMajorAlignment<typename DEVICE::index_t>>> input_matrix;
+    input_matrix._data = input;
+    bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, OUTPUT_DIM, bpt::matrix::layouts::RowMajorAlignment<typename DEVICE::index_t>>> output_matrix;
+    output_matrix._data = output;
+    bpt::forward(device, network, input_matrix);
+    DTYPE d_loss_d_output[OUTPUT_DIM];
+    bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, OUTPUT_DIM, bpt::matrix::layouts::RowMajorAlignment<typename DEVICE::index_t>>> d_loss_d_output_matrix;
+    d_loss_d_output_matrix._data = d_loss_d_output;
+    bpt::nn::loss_functions::mse::gradient(device, network.output_layer.output, output_matrix, d_loss_d_output_matrix);
+    DTYPE d_input[INPUT_DIM];
+    bpt::zero_gradient(device, network);
+    bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, INPUT_DIM, bpt::matrix::layouts::RowMajorAlignment<typename DEVICE::index_t>>> d_input_matrix;
+    d_input_matrix._data = d_input;
+    bpt::backward(device, network, input_matrix, d_loss_d_output_matrix, d_input_matrix, network_buffers);
+    bpt::reset_optimizer_state(device, network, optimizer);
+    bpt::update(device, network, optimizer);
+
+    DTYPE out = abs_diff_matrix(
+            network.input_layer.weights.parameters,
+            batch_0_input_layer_weights
+    );
+    ASSERT_LT(out, 1.5e-7);
+}
+#endif
+#endif
+
+//#ifdef SKIP_TESTS
+//TEST_F(NeuralNetworkTest, OverfitSample) {
+//    this->reset();
+//
+//    DTYPE input[INPUT_DIM];
+//    DTYPE output[OUTPUT_DIM];
+//    standardise<DTYPE, INPUT_DIM>(X_train[1].data(), X_mean.data(), X_std.data(), input);
+//    standardise<DTYPE, OUTPUT_DIM>(Y_train[1].data(), Y_mean.data(), Y_std.data(), ou
