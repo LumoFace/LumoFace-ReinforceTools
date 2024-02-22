@@ -314,4 +314,60 @@ TEST_F(BACKPROP_TOOLS_NN_MLP_OVERFIT_BATCH, OverfitBatch) {
             standardise<DTYPE, OUTPUT_DIM>(Y_train[batch_i_real * batch_size + sample_i].data(), Y_mean.data(), Y_std.data(), output);
             bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, INPUT_DIM, bpt::matrix::layouts::RowMajorAlignment<typename NN_DEVICE::index_t>>> input_matrix;
             input_matrix._data = input;
-            bpt::MatrixDynamic
+            bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, OUTPUT_DIM>> output_matrix;
+            output_matrix._data = output;
+            bpt::forward(device, network, input_matrix);
+            DTYPE d_loss_d_output[OUTPUT_DIM];
+            bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, OUTPUT_DIM>> d_loss_d_output_matrix;
+            d_loss_d_output_matrix._data = d_loss_d_output;
+            bpt::nn::loss_functions::mse::gradient(device, network.output_layer.output, output_matrix, d_loss_d_output_matrix, DTYPE(1)/batch_size);
+            loss += bpt::nn::loss_functions::mse::evaluate(device, network.output_layer.output, output_matrix, DTYPE(1)/batch_size);
+
+            DTYPE d_input[INPUT_DIM];
+            bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, INPUT_DIM>> d_input_matrix;
+            d_input_matrix._data = d_input;
+            bpt::backward(device, network, input_matrix, d_loss_d_output_matrix, d_input_matrix, network_buffers);
+        }
+        loss /= batch_size;
+
+        std::cout << "batch_i " << batch_i << " loss: " << loss << std::endl;
+
+        bpt::update(device, network, optimizer);
+//        constexpr int comp_batch = 100;
+//        if(batch_i == comp_batch){
+        std::stringstream ss;
+        ss << "model_2/overfit_small_batch/" << batch_i;
+        DTYPE diff = abs_diff_network<DTYPE>(network, data_file.getGroup(ss.str()));
+        std::cout << "batch_i: " << batch_i << " diff: " << diff << std::endl;
+        if(batch_i == 10){
+            ASSERT_LT(diff, 2.5e-7 * 3 * N_WEIGHTS);
+        } else {
+            if(batch_i == 100){
+                ASSERT_LT(diff, 1.0e-4 * N_WEIGHTS);
+            }
+        }
+    }
+    ASSERT_LT(loss, 1e-10);
+}
+#endif
+
+#ifndef SKIP_TESTS
+TEST_F(BACKPROP_TOOLS_NN_MLP_OVERFIT_BATCH, OverfitBatches) {
+    std::vector<DTYPE> losses;
+    bpt::nn::optimizers::Adam<bpt::nn::optimizers::adam::DefaultParametersTorch<DTYPE>> optimizer;
+    constexpr int n_batches = 10;
+    for(int batch_i_real=0; batch_i_real < n_batches; batch_i_real++){
+        this->reset();
+
+        constexpr int n_iter = 1000;
+        constexpr int batch_size = 32;
+        DTYPE loss = 0;
+        bpt::reset_optimizer_state(device, network, optimizer);
+        for (int batch_i=0; batch_i < n_iter; batch_i++){
+            loss = 0;
+            bpt::zero_gradient(device, network);
+            for (int sample_i=0; sample_i < batch_size; sample_i++){
+                DTYPE input[INPUT_DIM];
+                DTYPE output[OUTPUT_DIM];
+                standardise<DTYPE,  INPUT_DIM>(X_train[batch_i_real * batch_size + sample_i].data(), X_mean.data(), X_std.data(), input);
+                standardise<DTYPE, OUTPUT_DIM>(Y_train[batch_i_real * batch_size + sample_i].data(), Y_mean.data()
