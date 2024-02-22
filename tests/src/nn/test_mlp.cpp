@@ -370,4 +370,51 @@ TEST_F(BACKPROP_TOOLS_NN_MLP_OVERFIT_BATCH, OverfitBatches) {
                 DTYPE input[INPUT_DIM];
                 DTYPE output[OUTPUT_DIM];
                 standardise<DTYPE,  INPUT_DIM>(X_train[batch_i_real * batch_size + sample_i].data(), X_mean.data(), X_std.data(), input);
-                standardise<DTYPE, OUTPUT_DIM>(Y_train[batch_i_real * batch_size + sample_i].data(), Y_mean.data()
+                standardise<DTYPE, OUTPUT_DIM>(Y_train[batch_i_real * batch_size + sample_i].data(), Y_mean.data(), Y_std.data(), output);
+                bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, INPUT_DIM>> input_matrix;
+                input_matrix._data = input;
+                bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, OUTPUT_DIM>> output_matrix;
+                output_matrix._data = output;
+                bpt::forward(device, network, input_matrix);
+                DTYPE d_loss_d_output[OUTPUT_DIM];
+                bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, OUTPUT_DIM>> d_loss_d_output_matrix;
+                d_loss_d_output_matrix._data = d_loss_d_output;
+                bpt::nn::loss_functions::mse::gradient(device, network.output_layer.output, output_matrix, d_loss_d_output_matrix, DTYPE(1)/batch_size);
+                loss += bpt::nn::loss_functions::mse::evaluate(device, network.output_layer.output, output_matrix, DTYPE(1)/batch_size);
+
+                DTYPE d_input[INPUT_DIM];
+                bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, INPUT_DIM>> d_input_matrix;
+                d_input_matrix._data = d_input;
+                bpt::backward(device, network, input_matrix, d_loss_d_output_matrix, d_input_matrix, network_buffers);
+//                bpt::backward(device, network, input, d_loss_d_output, d_input);
+            }
+            loss /= batch_size;
+
+//            std::cout << "batch_i " << batch_i << " loss: " << loss << std::endl;
+
+            bpt::update(device, network, optimizer);
+        }
+        std::cout << "batch_i_real " << batch_i_real << " loss: " << loss << std::endl;
+        losses.push_back(loss);
+    }
+    DTYPE mean_loss = accumulate(losses.begin(), losses.end(), (DTYPE)0) / n_batches;
+    DTYPE std_loss = 0;
+    for(auto loss : losses){
+        std_loss += (loss - mean_loss) * (loss - mean_loss);
+    }
+    std_loss = sqrt(std_loss / n_batches);
+    DTYPE min_loss = *min_element(losses.begin(), losses.end());
+    DTYPE max_loss = *max_element(losses.begin(), losses.end());
+    std::sort(losses.begin(), losses.end());
+    DTYPE perc1_loss = losses[(int)(n_batches * 0.01)];
+    DTYPE perc5_loss = losses[(int)(n_batches * 0.05)];
+    DTYPE perc95_loss = losses[(int)(n_batches * 0.95)];
+    DTYPE perc99_loss = losses[(int)(n_batches * 0.99)];
+
+    constexpr DTYPE mean_loss_target   = 3.307228189225464e-12;
+    constexpr DTYPE std_loss_target    = 1.363137554222238e-11;
+    constexpr DTYPE min_loss_target    = 1.540076829357074e-14;
+    constexpr DTYPE max_loss_target    = 1.1320114290391814e-10;
+    constexpr DTYPE perc1_loss_target  = 2.662835865368629e-14;
+    constexpr DTYPE perc5_loss_target  = 3.350572399960167e-14;
+    constexpr DTYPE prec95_loss_target =
