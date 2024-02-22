@@ -250,4 +250,68 @@ TEST_F(BACKPROP_TOOLS_NN_MLP_ADAM_UPDATE, AdamUpdate) {
 //    DTYPE input[INPUT_DIM];
 //    DTYPE output[OUTPUT_DIM];
 //    standardise<DTYPE, INPUT_DIM>(X_train[1].data(), X_mean.data(), X_std.data(), input);
-//    standardise<DTYPE, OUTPUT_DIM>(Y_train[1].data(), Y_mean.data(), Y_std.data(), ou
+//    standardise<DTYPE, OUTPUT_DIM>(Y_train[1].data(), Y_mean.data(), Y_std.data(), output);
+//    constexpr int n_iter = 1000;
+//    DTYPE loss = 0;
+//    reset_optimizer_state(network);
+//    for (int batch_i = 0; batch_i < n_iter; batch_i++){
+//        forward(network, input);
+//        DTYPE d_loss_d_output[OUTPUT_DIM];
+//        d_mse_d_x<DTYPE, OUTPUT_DIM>(network.output_layer.output, output, d_loss_d_output);
+//        loss = mse<DTYPE, OUTPUT_DIM>(network.output_layer.output, output);
+//        std::cout << "batch_i: " << batch_i << " loss: " << loss << std::endl;
+//
+//        zero_gradient(network);
+//        DTYPE d_input[INPUT_DIM];
+//        backward(network, input, d_loss_d_output, d_input);
+//
+//        update(network, batch_i + 1, 1);
+//    }
+//    ASSERT_LT(loss, 5e-10);
+//
+//
+//}
+//#endif
+
+#ifndef SKIP_OVERFITTING_TESTS
+class BACKPROP_TOOLS_NN_MLP_OVERFIT_BATCH : public BACKPROP_TOOLS_NN_MLP_BACKWARD_PASS {
+public:
+    BACKPROP_TOOLS_NN_MLP_OVERFIT_BATCH() : BACKPROP_TOOLS_NN_MLP_BACKWARD_PASS(){
+        model_name = "model_2";
+    }
+protected:
+
+    void SetUp() override {
+        NeuralNetworkTest::SetUp();
+        this->reset();
+    }
+};
+#ifndef SKIP_TESTS
+TEST_F(BACKPROP_TOOLS_NN_MLP_OVERFIT_BATCH, OverfitBatch) {
+    this->reset();
+    bpt::nn::optimizers::Adam<bpt::nn::optimizers::adam::DefaultParametersTF<DTYPE>> optimizer;
+
+    auto data_file = HighFive::File(DATA_FILE_PATH, HighFive::File::ReadOnly);
+    HighFive::Group g = data_file.getGroup("model_2/overfit_small_batch");
+
+    constexpr int n_iter = 1000;
+    constexpr int batch_size = 32;
+    DTYPE loss = 0;
+    bpt::reset_optimizer_state(device, network, optimizer);
+    {
+        DTYPE diff = abs_diff_network<DTYPE>(network, data_file.getGroup(model_name+"/init"));
+        std::cout << "initial diff: " << diff << std::endl;
+        ASSERT_EQ(diff, 0);
+    }
+    for (int batch_i=0; batch_i < n_iter; batch_i++){
+        uint32_t batch_i_real = 0;
+        loss = 0;
+        bpt::zero_gradient(device, network);
+        for (int sample_i=0; sample_i < batch_size; sample_i++){
+            DTYPE input[INPUT_DIM];
+            DTYPE output[OUTPUT_DIM];
+            standardise<DTYPE,  INPUT_DIM>(X_train[batch_i_real * batch_size + sample_i].data(), X_mean.data(), X_std.data(), input);
+            standardise<DTYPE, OUTPUT_DIM>(Y_train[batch_i_real * batch_size + sample_i].data(), Y_mean.data(), Y_std.data(), output);
+            bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, INPUT_DIM, bpt::matrix::layouts::RowMajorAlignment<typename NN_DEVICE::index_t>>> input_matrix;
+            input_matrix._data = input;
+            bpt::MatrixDynamic
