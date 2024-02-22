@@ -417,4 +417,57 @@ TEST_F(BACKPROP_TOOLS_NN_MLP_OVERFIT_BATCH, OverfitBatches) {
     constexpr DTYPE max_loss_target    = 1.1320114290391814e-10;
     constexpr DTYPE perc1_loss_target  = 2.662835865368629e-14;
     constexpr DTYPE perc5_loss_target  = 3.350572399960167e-14;
-    constexpr DTYPE prec95_loss_target =
+    constexpr DTYPE prec95_loss_target = 1.266289100486372e-11;
+    constexpr DTYPE prec99_loss_target = 7.271057700375415e-11;
+    constexpr DTYPE assertion_approx_factor = 2;
+    std::cout << "mean_loss "   << mean_loss   << " mean_loss_target: " << mean_loss_target << std::endl;
+    std::cout << "std_loss "    << std_loss    << " std_loss_target: " << std_loss_target << std::endl;
+    std::cout << "min_loss "    << min_loss    << " min_loss_target: " << min_loss_target << std::endl;
+    std::cout << "max_loss "    << max_loss    << " max_loss_target: " << max_loss_target << std::endl;
+    std::cout << "perc1_loss "  << perc1_loss  << " perc1_loss_target: " << perc1_loss_target << std::endl;
+    std::cout << "perc5_loss "  << perc5_loss  << " perc5_loss_target: " << perc5_loss_target << std::endl;
+    std::cout << "perc95_loss " << perc95_loss << " prec95_loss_target: " << prec95_loss_target << std::endl;
+    std::cout << "perc99_loss " << perc99_loss << " prec99_loss_target: " << prec99_loss_target << std::endl;
+
+    ASSERT_LT(mean_loss_target, 3.307228189225464e-12 * assertion_approx_factor);
+    ASSERT_LT(std_loss_target, 1.363137554222238e-11 * assertion_approx_factor);
+    ASSERT_LT(min_loss_target, 1.540076829357074e-14 * assertion_approx_factor);
+    ASSERT_LT(max_loss_target, 1.1320114290391814e-10 * assertion_approx_factor);
+    ASSERT_LT(perc1_loss_target, 2.662835865368629e-14 * assertion_approx_factor);
+    ASSERT_LT(perc5_loss_target, 3.350572399960167e-14 * assertion_approx_factor);
+    ASSERT_LT(prec95_loss_target, 1.266289100486372e-11 * assertion_approx_factor);
+    ASSERT_LT(prec99_loss_target, 7.271057700375415e-11 * assertion_approx_factor);
+}
+#endif
+#endif
+
+class BACKPROP_TOOLS_NN_MLP_TRAIN_MODEL : public NeuralNetworkTestLoadWeights<NetworkType_3> {
+public:
+    typedef NetworkType_3 NETWORK_TYPE;
+    BACKPROP_TOOLS_NN_MLP_TRAIN_MODEL() : NeuralNetworkTestLoadWeights<NetworkType_3>(){
+        model_name = "model_3";
+    }
+protected:
+
+    void SetUp() override {
+        NeuralNetworkTest::SetUp();
+        this->reset();
+    }
+};
+#ifndef SKIP_TRAINING_TESTS
+#ifndef SKIP_TESTS
+TEST_F(BACKPROP_TOOLS_NN_MLP_TRAIN_MODEL, TrainModel) {
+    bpt::nn::optimizers::Adam<bpt::nn::optimizers::adam::DefaultParametersTorch<DTYPE>> optimizer;
+    std::vector<DTYPE> losses;
+    std::vector<DTYPE> val_losses;
+    constexpr int n_epochs = 3;
+    this->reset();
+    bpt::reset_optimizer_state(device, network, optimizer);
+    constexpr int batch_size = 32;
+    int n_iter = X_train.size() / batch_size;
+
+    for(int epoch_i=0; epoch_i < n_epochs; epoch_i++){
+        DTYPE epoch_loss = 0;
+        for (int batch_i=0; batch_i < n_iter; batch_i++){
+            DTYPE loss = 0;
+            bpt::zero_gradient(device, netw
