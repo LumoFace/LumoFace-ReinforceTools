@@ -510,4 +510,70 @@ TEST_F(BACKPROP_TOOLS_NN_MLP_TRAIN_MODEL, TrainModel) {
             DTYPE output[OUTPUT_DIM];
             standardise<DTYPE,  INPUT_DIM>(X_val[sample_i].data(), X_mean.data(), X_std.data(), input);
             standardise<DTYPE, OUTPUT_DIM>(Y_val[sample_i].data(), Y_mean.data(), Y_std.data(), output);
-            bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, INPUT_DIM
+            bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, INPUT_DIM>> input_matrix;
+            input_matrix._data = input;
+            bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, NN_DEVICE::index_t, 1, OUTPUT_DIM>> output_matrix;
+            output_matrix._data = output;
+            bpt::forward(device, network, input_matrix);
+            val_loss += bpt::nn::loss_functions::mse::evaluate(device, network.output_layer.output, output_matrix, DTYPE(1)/batch_size);
+        }
+        val_loss /= X_val.size();
+        val_losses.push_back(val_loss);
+    }
+
+
+    for (int i=0; i < losses.size(); i++){
+        std::cout << "epoch_i " << i << " loss: train:" << losses[i] << " val: " << val_losses[i] << std::endl;
+    }
+    // loss
+    // array([0.05651794, 0.02564381, 0.02268129, 0.02161846, 0.02045725,
+    //       0.01928116, 0.01860152, 0.01789362, 0.01730141, 0.01681832],
+    //      dtype=float32)
+
+    // val_loss
+    // array([0.02865824, 0.02282167, 0.02195382, 0.02137529, 0.02023922,
+    //       0.0191351 , 0.01818279, 0.01745798, 0.01671058, 0.01628938],
+    //      dtype=float32)
+
+    ASSERT_LT(losses[0], 0.06);
+    ASSERT_LT(losses[1], 0.03);
+    ASSERT_LT(losses[2], 0.025);
+//    ASSERT_LT(losses[9], 0.02);
+    ASSERT_LT(val_losses[0], 0.04);
+    ASSERT_LT(val_losses[1], 0.03);
+    ASSERT_LT(val_losses[2], 0.025);
+//    ASSERT_LT(val_losses[9], 0.02);
+
+// GELU PyTorch [0.00456139 0.00306715 0.00215886]
+}
+#endif
+
+#ifndef SKIP_TESTS
+TEST_F(BACKPROP_TOOLS_NN_MLP_TRAIN_MODEL, ModelInitTrain) {
+    bpt::nn::optimizers::Adam<bpt::nn::optimizers::adam::DefaultParametersTorch<DTYPE>> optimizer;
+    NN_DEVICE::SPEC::LOGGING logger;
+    NN_DEVICE device;
+    device.logger = &logger;
+    NetworkType network;
+    bpt::malloc(device, network);
+    std::vector<DTYPE> losses;
+    std::vector<DTYPE> val_losses;
+    constexpr int n_epochs = 3;
+//    this->reset();
+    bpt::reset_optimizer_state(device, network, optimizer);
+    std::mt19937 rng(2);
+    bpt::init_weights(device, network, rng);
+
+    constexpr int batch_size = 32;
+    int n_iter = X_train.size() / batch_size;
+
+    for(int epoch_i=0; epoch_i < n_epochs; epoch_i++){
+        DTYPE epoch_loss = 0;
+        for (int batch_i=0; batch_i < n_iter; batch_i++){
+            DTYPE loss = 0;
+            bpt::zero_gradient(device, network);
+            for (int sample_i=0; sample_i < batch_size; sample_i++){
+                DTYPE input[INPUT_DIM];
+                DTYPE output[OUTPUT_DIM];
+                standardise<DTYPE,  INPUT_DIM>(X_train[batch_i * batch_size + sample_i].data(), X_mean.data(), X_std.data(), input);
+                standardise<DTYPE, OUTPUT_DIM>(Y_train[batch_i * batch_size + sample_i].data(), Y_mean.d
