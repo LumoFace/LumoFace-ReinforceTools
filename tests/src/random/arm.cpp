@@ -93,4 +93,83 @@ void test_real_uniform_distribution(){
         if(number - min <= threshold) {
             smaller_than_half++;
         }
-      
+        else{
+            bigger_than_half++;
+        }
+        ASSERT_TRUE(number >= min);
+        ASSERT_TRUE(number <= max);
+    }
+    std::cout << "smaller_than_half: " << (float)smaller_than_half/NUM_RUNS << " bigger_than_half: " << (float)bigger_than_half/NUM_RUNS << std::endl;
+}
+TEST(BACKPROP_TOOLS_RANDOM_ARM, TEST_REAL_UNIFORM_DISTRIBUTION) {
+    test_real_uniform_distribution<float, 0, 10, 1000>();
+    test_real_uniform_distribution<float, -10, 10, 1000>();
+    test_real_uniform_distribution<float, -10, 0, 1000>();
+    test_real_uniform_distribution<float, -1000, 1000000, 1000>();
+    test_real_uniform_distribution<float, -1, 1, 1000>();
+    test_real_uniform_distribution<float, 0, 1, 1000>();
+}
+
+template <typename T, auto MEAN, auto STD, auto DENOMINATOR, int NUM_RUNS = 10000000>
+void test_normal_distribution(){
+    namespace bpt = backprop_tools;
+    using DEVICE = bpt::devices::DefaultARM;
+    using TI = typename DEVICE::index_t;
+    auto rng = bpt::random::default_engine(DEVICE::SPEC::RANDOM());
+    T mean = (T)MEAN / (T)DENOMINATOR;
+    T std = (T)STD / (T)DENOMINATOR;
+    TI smaller_than_mean = 0;
+    TI bigger_than_mean = 0;
+    TI smaller_than_one_sigma = 0;
+    TI bigger_than_one_sigma = 0;
+    TI smaller_than_two_sigma = 0;
+    TI bigger_than_two_sigma = 0;
+    TI smaller_than_three_sigma = 0;
+    TI bigger_than_three_sigma = 0;
+    TI smaller_than_four_sigma = 0;
+    TI bigger_than_four_sigma = 0;
+
+
+    for(unsigned i = 0; i < NUM_RUNS; ++i){
+        auto number = bpt::random::normal_distribution(DEVICE::SPEC::RANDOM(), mean, std, rng);
+        if(number <= mean) {
+            smaller_than_mean++;
+        }
+        else{
+            bigger_than_mean++;
+        }
+        if(number <= mean - std) {
+            smaller_than_one_sigma++;
+        }
+        else{
+            if(number >= mean + std){
+                bigger_than_one_sigma++;
+            }
+        }
+        if(number <= mean - 2*std) {
+            smaller_than_two_sigma++;
+        }
+        else{
+            if(number >= mean + 2*std){
+                bigger_than_two_sigma++;
+            }
+        }
+        if(number <= mean - 3*std) {
+            smaller_than_three_sigma++;
+        }
+        else{
+            if(number >= mean + 3*std){
+                bigger_than_three_sigma++;
+            }
+        }
+        if(number <= mean - 4*std) {
+            smaller_than_four_sigma++;
+        }
+        else{
+            if(number >= mean + 4*std){
+                bigger_than_four_sigma++;
+            }
+        }
+    }
+    std::cout << "smaller_than_mean: " << (float)smaller_than_mean/NUM_RUNS << " bigger_than_half: " << (float)bigger_than_mean/NUM_RUNS << std::endl;
+    std::cout << "smaller_t
