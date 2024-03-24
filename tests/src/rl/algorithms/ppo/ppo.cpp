@@ -1,0 +1,51 @@
+#include <backprop_tools/operations/cpu_mux.h>
+#include <backprop_tools/nn/operations_cpu_mux.h>
+#include <backprop_tools/nn_models/operations_cpu.h>
+namespace bpt = backprop_tools;
+#include "parameters_rl.h"
+#include <backprop_tools/rl/components/on_policy_runner/operations_generic.h>
+#include <backprop_tools/rl/algorithms/ppo/operations_generic.h>
+
+#include <gtest/gtest.h>
+
+namespace parameters = parameters_0;
+
+using LOGGER = bpt::devices::logging::CPU_TENSORBOARD;
+using DEV_SPEC = bpt::devices::cpu::Specification<bpt::devices::math::CPU, bpt::devices::random::CPU, LOGGER>;
+
+using DEVICE = bpt::DEVICE_FACTORY<DEV_SPEC>;
+using T = float;
+using TI = typename DEVICE::index_t;
+
+
+
+
+TEST(BACKPROP_TOOLS_RL_ALGORITHMS_PPO, TEST){
+    using penv = parameters::environment<T, TI>;
+    using prl = parameters::rl<T, TI, penv::ENVIRONMENT>;
+
+    DEVICE::SPEC::LOGGING logger;
+    DEVICE device;
+    prl::OPTIMIZER actor_optimizer, critic_optimizer;
+    auto rng = bpt::random::default_engine(DEVICE::SPEC::RANDOM(), 10);
+    prl::PPO_TYPE ppo;
+    prl::PPO_BUFFERS_TYPE ppo_buffers;
+    prl::ON_POLICY_RUNNER_TYPE on_policy_runner;
+    prl::ON_POLICY_RUNNER_DATASET_TYPE on_policy_runner_dataset;
+    prl::ACTOR_EVAL_BUFFERS actor_eval_buffers;
+    prl::ACTOR_BUFFERS actor_buffers;
+    prl::CRITIC_BUFFERS critic_buffers;
+    prl::CRITIC_BUFFERS_ALL critic_buffers_all;
+
+    bpt::malloc(device, ppo);
+    bpt::malloc(device, ppo_buffers);
+    bpt::malloc(device, on_policy_runner_dataset);
+    bpt::malloc(device, on_policy_runner);
+    bpt::malloc(device, actor_eval_buffers);
+    bpt::malloc(device, actor_buffers);
+    bpt::malloc(device, critic_buffers);
+    bpt::malloc(device, critic_buffers_all);
+
+    penv::ENVIRONMENT envs[prl::N_ENVIRONMENTS];
+    bpt::init(device, on_policy_runner, envs, rng);
+    bpt::init(device, ppo, act
