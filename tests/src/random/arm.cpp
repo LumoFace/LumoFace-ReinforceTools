@@ -172,4 +172,38 @@ void test_normal_distribution(){
         }
     }
     std::cout << "smaller_than_mean: " << (float)smaller_than_mean/NUM_RUNS << " bigger_than_half: " << (float)bigger_than_mean/NUM_RUNS << std::endl;
-    std::cout << "smaller_t
+    std::cout << "smaller_than_one_sigma: " << (float)smaller_than_one_sigma/NUM_RUNS << " bigger_than_one_sigma: " << (float)bigger_than_one_sigma/NUM_RUNS << std::endl;
+    std::cout << "smaller_than_two_sigma: " << (float)smaller_than_two_sigma/NUM_RUNS << " bigger_than_two_sigma: " << (float)bigger_than_two_sigma/NUM_RUNS << std::endl;
+    std::cout << "smaller_than_three_sigma: " << (float)smaller_than_three_sigma/NUM_RUNS << " bigger_than_three_sigma: " << (float)bigger_than_three_sigma/NUM_RUNS << std::endl;
+    std::cout << "smaller_than_four_sigma: " << (float)smaller_than_four_sigma/NUM_RUNS << " bigger_than_four_sigma: " << (float)bigger_than_four_sigma/NUM_RUNS << std::endl;
+    ASSERT_LT(std::abs((float)smaller_than_mean/NUM_RUNS - 0.5), 0.01);
+    T thres = (T)10000 / (T)NUM_RUNS;
+    T mass_bigger_than_one_sigma = (float)smaller_than_one_sigma/NUM_RUNS + (float)bigger_than_one_sigma/NUM_RUNS;
+    T mass_bigger_than_one_sigma_diff = std::abs(mass_bigger_than_one_sigma - 0.31731050786291404);
+    T mass_bigger_than_two_sigma = (float)smaller_than_two_sigma/NUM_RUNS + (float)bigger_than_two_sigma/NUM_RUNS;
+    T mass_bigger_than_two_sigma_diff = std::abs(mass_bigger_than_two_sigma - 0.04550026389635797);
+    T mass_bigger_than_three_sigma = (float)smaller_than_three_sigma/NUM_RUNS + (float)bigger_than_three_sigma/NUM_RUNS;
+    T mass_bigger_than_three_sigma_diff = std::abs(mass_bigger_than_three_sigma - 0.002699796063259985);
+    T mass_bigger_than_four_sigma = (float)smaller_than_four_sigma/NUM_RUNS + (float)bigger_than_four_sigma/NUM_RUNS;
+    T mass_bigger_than_four_sigma_diff = std::abs(mass_bigger_than_four_sigma - 6.334248366601791e-5);
+    if(
+            mass_bigger_than_one_sigma_diff > thres ||
+            mass_bigger_than_two_sigma_diff > thres ||
+            mass_bigger_than_three_sigma_diff > thres ||
+            mass_bigger_than_four_sigma_diff > thres
+    ){
+        std::cout << "mass_bigger_than_one_sigma_diff: " << mass_bigger_than_one_sigma_diff << std::endl;
+        std::cout << "mass_bigger_than_two_sigma_diff: " << mass_bigger_than_two_sigma_diff << std::endl;
+        std::cout << "mass_bigger_than_three_sigma_diff: " << mass_bigger_than_three_sigma_diff << std::endl;
+        std::cout << "mass_bigger_than_four_sigma_diff: " << mass_bigger_than_four_sigma_diff << std::endl;
+    }
+    ASSERT_LT(mass_bigger_than_one_sigma_diff, thres);
+    ASSERT_LT(mass_bigger_than_two_sigma_diff, thres);
+    ASSERT_LT(mass_bigger_than_three_sigma_diff, thres);
+    ASSERT_LT(mass_bigger_than_four_sigma_diff, thres);
+
+}
+TEST(BACKPROP_TOOLS_RANDOM_ARM, TEST_NORMAL_DISTRIBUTION) {
+    test_normal_distribution<float, 0, 10, 1>();
+    test_normal_distribution<float, -10, 10, 10>();
+    test_normal_d
