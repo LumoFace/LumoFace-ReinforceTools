@@ -206,4 +206,8 @@ void test_normal_distribution(){
 TEST(BACKPROP_TOOLS_RANDOM_ARM, TEST_NORMAL_DISTRIBUTION) {
     test_normal_distribution<float, 0, 10, 1>();
     test_normal_distribution<float, -10, 10, 10>();
-    test_normal_d
+    test_normal_distribution<float, -10, 1, 1>();
+    test_normal_distribution<float, -1000, 1000000, 100>();
+    test_normal_distribution<float, -1, 1, 10>();
+    test_normal_distribution<float, 0, 1, 1, 1000000>();
+}
