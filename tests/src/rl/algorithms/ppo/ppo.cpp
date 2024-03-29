@@ -91,4 +91,16 @@ TEST(BACKPROP_TOOLS_RL_ALGORITHMS_PPO, TEST){
         }
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<T> elapsed = end - start;
-//        std::cout << "Total: " << elapsed.coun
+//        std::cout << "Total: " << elapsed.count() << " s" << std::endl;
+    }
+
+    bpt::free(device, ppo);
+    bpt::free(device, ppo_buffers);
+    bpt::free(device, on_policy_runner_dataset);
+    bpt::free(device, on_policy_runner);
+    bpt::free(device, actor_eval_buffers);
+    bpt::free(device, actor_buffers);
+    bpt::free(device, critic_buffers);
+    bpt::free(device, critic_buffers_all);
+
+}
