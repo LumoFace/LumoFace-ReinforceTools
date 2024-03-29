@@ -396,3 +396,139 @@ TEST(BACKPROP_TOOLS_RL_ALGORITHMS_TD3_MLP_SECOND_STAGE, TEST_COPY_TRAINING) {
 //                std::cout << "        pre_post_diff_grad_per_weight: " << pre_post_diff_grad_per_weight << std::endl;
 //                std::cout << "        diff_target_grad_per_weight: " << diff_target_grad_per_weight << std::endl;
                 std::cout << "        update ratio grad: " << diff_ratio_grad << std::endl;
+
+//                std::cout << "        pre_post_diff_adam_per_weight: " << pre_post_diff_adam_per_weight << std::endl;
+//                std::cout << "        diff_target_adam_per_weight: " << diff_target_adam_per_weight << std::endl;
+                std::cout << "        update ratio adam: " << diff_ratio_adam << std::endl;
+            }
+
+            switch(step_i){
+                case 0: {
+                    ASSERT_GT(diff_ratio, 1e6);
+                    ASSERT_GT(diff_ratio_grad, 1e6);
+                    ASSERT_GT(diff_ratio_adam, 1e6);
+                }
+                break;
+            }
+
+            mean_ratio_actor += diff_ratio;
+            mean_ratio_actor_grad += diff_ratio_grad;
+            mean_ratio_actor_adam += diff_ratio_adam;
+
+            bpt::copy(device, device, pre_actor, actor_critic.actor);
+            bpt::free(device, post_actor);
+            bpt::free(device, pre_actor_loaded);
+        }
+        if(step_group.exist("critic1_target")){
+            if(verbose){
+                std:: cout << "    target update" << std::endl;
+            }
+            if (step_i == 0){
+                decltype(actor_critic.critic_target_1) pre_critic_1_target_step;
+                bpt::malloc(device, pre_critic_1_target_step);
+                bpt::load(device, pre_critic_1_target_step, step_group.getGroup("pre_critic1_target"));
+                DTYPE pre_current_diff = abs_diff(device, pre_critic_1_target_step, actor_critic.critic_target_1);
+                ASSERT_EQ(pre_current_diff, 0);
+                bpt::free(device, pre_critic_1_target_step);
+            }
+            else{
+                if (step_i >= ActorCriticType::SPEC::PARAMETERS::CRITIC_BATCH_SIZE){
+
+                    decltype(actor_critic.critic_target_1) post_critic_1_target;
+                    bpt::malloc(device, post_critic_1_target);
+                    bpt::load(device, post_critic_1_target, step_group.getGroup("critic1_target"));
+
+                    bpt::update_critic_targets(device, actor_critic);
+                    bpt::update_actor_target(device, actor_critic);
+
+                    DTYPE pre_post_diff_per_weight = abs_diff(device, pre_critic_1_target, post_critic_1_target)/ActorCriticType::SPEC::CRITIC_NETWORK_TYPE::NUM_WEIGHTS;
+                    DTYPE diff_target_per_weight = abs_diff(device, post_critic_1_target, actor_critic.critic_target_1)/ActorCriticType::SPEC::CRITIC_NETWORK_TYPE::NUM_WEIGHTS;
+                    DTYPE diff_ratio = pre_post_diff_per_weight/diff_target_per_weight;
+
+                    if(verbose){
+                        std::cout << "    critic target update" << std::endl;
+//                        std::cout << "        pre_post_diff_per_weight: " << pre_post_diff_per_weight << std::endl;
+//                        std::cout << "        diff_target_per_weight: " << diff_target_per_weight << std::endl;
+                        std::cout << "        update ratio     : " << diff_ratio << std::endl;
+                    }
+
+                    switch(step_i){
+                        case 0: {
+                            ASSERT_GT(diff_ratio, 1e6);
+                        }
+                            break;
+                    }
+
+                    mean_ratio_critic_target += diff_ratio;
+
+                    bpt::copy(device, device, pre_critic_1_target, actor_critic.critic_target_1);
+
+//                    if(true){//(step_i % 100 == 0){
+//                        DTYPE diff = 0;
+//                        for(int batch_sample_i = 0; batch_sample_i < ActorCriticType::SPEC::PARAMETERS::CRITIC_BATCH_SIZE; batch_sample_i++){
+//                            DTYPE input[ActorCriticType::SPEC::ENVIRONMENT::OBSERVATION_DIM + ActorCriticType::SPEC::ENVIRONMENT::ACTION_DIM];
+//                            bpt::utils::memcpy(input, &replay_buffer.observations.data[batch_sample_i*ENVIRONMENT::OBSERVATION_DIM], ActorCriticType::SPEC::ENVIRONMENT::OBSERVATION_DIM);
+//                            bpt::utils::memcpy(&input[ActorCriticType::SPEC::ENVIRONMENT::OBSERVATION_DIM], &replay_buffer.actions.data[batch_sample_i*ENVIRONMENT::ACTION_DIM], ActorCriticType::SPEC::ENVIRONMENT::ACTION_DIM);
+//                            bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, DEVICE::index_t, 1, ActorCriticType::SPEC::ENVIRONMENT::OBSERVATION_DIM + ActorCriticType::SPEC::ENVIRONMENT::ACTION_DIM>> input_matrix = {input};
+//                            DTYPE current_value;
+//                            bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, DEVICE::index_t, 1, 1>> current_value_matrix = {&current_value};
+//                            bpt::evaluate(device, actor_critic.critic_target_1, input_matrix, current_value_matrix);
+//                            DTYPE desired_value;
+//                            bpt::MatrixDynamic<bpt::matrix::Specification<DTYPE, DEVICE::index_t, 1, 1>> desired_value_matrix = {&desired_value};
+//                            bpt::evaluate(device, post_critic_1_target, input_matrix, desired_value_matrix);
+//                            diff += (current_value - desired_value) * (current_value - desired_value) / ActorCriticType::SPEC::PARAMETERS::CRITIC_BATCH_SIZE;
+//                        }
+////                        std::cout << "value mse: " << diff << std::endl;
+//                    }
+                    bpt::free(device, post_critic_1_target);
+                }
+            }
+
+        }
+        if(step_i % 100 == 0){
+            if(!verbose){
+                std::cout << "step_i: " << step_i << std::endl;
+            }
+            auto result = bpt::evaluate(device, env, ui, actor_critic.actor, bpt::rl::utils::evaluation::Specification<100, 200>(), rng, true);
+#ifdef BACKPROP_TOOLS_TEST_RL_ALGORITHMS_TD3_SECOND_STAGE_OUTPUT_PLOTS
+            plot_policy_and_value_function<DTYPE, ENVIRONMENT, ActorCriticType::ACTOR_NETWORK_TYPE, ActorCriticType::CRITIC_NETWORK_TYPE>(actor_critic.actor, actor_critic.critic_1, std::string("second_stage"), step_i);
+#endif
+#ifdef BACKPROP_TOOLS_TEST_RL_ALGORITHMS_TD3_SECOND_STAGE_EVALUATE_VISUALLY
+            if(mean_return > -400){
+                while(true){
+                    ENVIRONMENT::State initial_state;
+                    bpt::sample_initial_state(env, initial_state, rng);
+                    bpt::evaluate_visual<ENVIRONMENT, UI, decltype(actor_critic.actor), 100, 3>(env, ui, actor_critic.actor, initial_state);
+                }
+            }
+#endif
+        }
+    }
+    mean_ratio_critic /= num_steps;
+    mean_ratio_critic_grad /= num_steps;
+    mean_ratio_critic_adam /= num_steps;
+    mean_ratio_actor /= num_steps;
+    mean_ratio_actor_grad /= num_steps;
+    mean_ratio_actor_adam /= num_steps;
+    mean_ratio_critic_target /= num_steps;
+    std::cout << "mean_ratio_critic: " << mean_ratio_critic << std::endl;
+    std::cout << "mean_ratio_critic_grad: " << mean_ratio_critic_grad << std::endl;
+    std::cout << "mean_ratio_critic_adam: " << mean_ratio_critic_adam << std::endl;
+    std::cout << "mean_ratio_actor: " << mean_ratio_actor << std::endl;
+    std::cout << "mean_ratio_actor_grad: " << mean_ratio_actor_grad << std::endl;
+    std::cout << "mean_ratio_actor_adam: " << mean_ratio_actor_adam << std::endl;
+    std::cout << "mean_ratio_critic_target: " << mean_ratio_critic_target << std::endl;
+    ASSERT_GT(mean_ratio_critic, 1e12);
+    ASSERT_GT(mean_ratio_critic_grad, 1e13);
+    ASSERT_GT(mean_ratio_critic_adam, 1e12);
+    ASSERT_GT(mean_ratio_actor, 1e12);
+    ASSERT_GT(mean_ratio_actor_grad, 1e12);
+    ASSERT_GT(mean_ratio_actor_adam, 1e12);
+    ASSERT_GT(mean_ratio_critic_target, 1e11);
+
+    bpt::free(device, critic_batch);
+    bpt::free(device, critic_training_buffers);
+    bpt::free(device, actor_batch);
+    bpt::free(device, actor_training_buffers);
+    bpt::free(device, off_policy_runner);
+}
