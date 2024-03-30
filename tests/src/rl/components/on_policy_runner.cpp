@@ -53,4 +53,50 @@ TEST(BACKPROP_TOOLS_RL_COMPONENTS_ON_POLICY_RUNNER, TEST){
 
     bpt::collect(device, dataset, runner, actor, actor_buffers, rng);
     bpt::print(device, dataset.data);
-    bpt::collect(device, dataset, runner, ac
+    bpt::collect(device, dataset, runner, actor, actor_buffers, rng);
+    bpt::print(device, dataset.data);
+    bpt::collect(device, dataset, runner, actor, actor_buffers, rng);
+    bpt::print(device, dataset.data);
+    ENVIRONMENT::State states[ON_POLICY_RUNNER_SPEC::N_ENVIRONMENTS];
+    for(TI env_i = 0; env_i < ON_POLICY_RUNNER_SPEC::N_ENVIRONMENTS; env_i++){
+        states[env_i] = get(runner.states, 0, env_i);
+    }
+    bpt::collect(device, dataset, runner, actor, actor_buffers, rng);
+    for(TI env_i = 0; env_i < ON_POLICY_RUNNER_SPEC::N_ENVIRONMENTS; env_i++){
+        for(TI step_i = 0; step_i < DATASET_SPEC::STEPS_PER_ENV; step_i++){
+            TI pos = step_i * ON_POLICY_RUNNER_SPEC::N_ENVIRONMENTS + env_i;
+            {
+                bpt::MatrixDynamic<bpt::matrix::Specification<T, TI, 1, ENVIRONMENT::OBSERVATION_DIM>> observation;
+                bpt::malloc(device, observation);
+                bpt::observe(device, get(runner.environments, 0, env_i), states[env_i], observation);
+                auto observation_runner = bpt::view<DEVICE, decltype(dataset.observations)::SPEC, 1, ENVIRONMENT::OBSERVATION_DIM>(device, dataset.observations, pos, 0);
+                auto abs_diff = bpt::abs_diff(device, observation, observation_runner);
+                if(!get(dataset.truncated, pos, 0)){
+//                    ASSERT_FLOAT_EQ(abs_diff, 0);
+                }
+                bpt::free(device, observation);
+            }
+            typename ENVIRONMENT::State next_state;
+            auto action = bpt::view<DEVICE, decltype(dataset.actions)::SPEC, 1, ENVIRONMENT::ACTION_DIM>(device, dataset.actions, pos, 0);
+            step(device, get(runner.environments, 0, env_i), states[env_i], action, next_state);
+            states[env_i] = next_state;
+        }
+    }
+    std::string FILE_PATH = "test_rl_components_on_policy_runner_dataset.h5";
+    {
+        auto file = HighFive::File(FILE_PATH, HighFive::File::Overwrite);
+        bpt::save(device, dataset, file.createGroup("dataset"));
+    }
+
+    {
+        auto file = HighFive::File(FILE_PATH, HighFive::File::ReadOnly);
+        DATASET loaded;
+        bpt::malloc(device, loaded);
+        bpt::load(device, loaded, file.getGroup("dataset"));
+        auto abs_diff = bpt::abs_diff(device, loaded.data, dataset.data);
+        ASSERT_FLOAT_EQ(0, abs_diff);
+    }
+
+
+
+}
