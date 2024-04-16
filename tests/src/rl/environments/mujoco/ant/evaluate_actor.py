@@ -46,4 +46,7 @@ while True:
     print(f"x pos: {env.data.qpos[0]}")
     if terminated or truncated:
         obs, _ = env.reset()
-        print(f"Episode
+        print(f"Episode reward: {reward_acc} after {step} steps.")
+        reward_acc = 0
+        step = 0
+    step += 1
