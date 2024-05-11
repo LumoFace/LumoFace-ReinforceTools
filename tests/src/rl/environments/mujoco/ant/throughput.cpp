@@ -80,4 +80,83 @@ TEST(BACKPROP_TOOLS_RL_ENVIRONMENTS_MUJOCO_ANT, THROUGHPUT_MULTI_CORE_INDEPENDEN
     auto proto_rng = bpt::random::default_engine(DEVICE::SPEC::RANDOM(), 10);
     decltype(proto_rng) rngs[NUM_THREADS];
 
-    for(TI env_i = 0; env_i < NUM_T
+    for(TI env_i = 0; env_i < NUM_THREADS; env_i++){
+        bpt::malloc(device, envs[env_i]);
+    }
+    bpt::malloc(device, actions);
+
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for(TI env_i = 0; env_i < NUM_THREADS; env_i++){
+        threads[env_i] = std::thread([&device, &rngs, &actions, &envs, env_i](){
+            STATE state, next_state;
+            auto rng = rngs[env_i];
+            auto& env = envs[env_i];
+            auto action = bpt::view(device, actions, bpt::matrix::ViewSpec<1, envp::ENVIRONMENT::ACTION_DIM>(), env_i, 0);
+            bpt::randn(device, action, rng);
+            bpt::sample_initial_state(device, env, state, rng);
+            for(TI step_i = 0; step_i < NUM_STEPS_PER_THREAD; step_i++){
+                bpt::step(device, env, state, action, next_state);
+                if(step_i % 1000 == 0 || bpt::terminated(device, env, next_state, rng)) {
+                    bpt::sample_initial_state(device, env, state, rng);
+                }
+            }
+        });
+    }
+    for(TI env_i = 0; env_i < NUM_THREADS; env_i++){
+        threads[env_i].join();
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    auto steps_per_second = NUM_STEPS_PER_THREAD * NUM_THREADS * 1000.0 / duration.count();
+    auto frames_per_second = steps_per_second * envp::ENVIRONMENT::SPEC::PARAMETERS::FRAME_SKIP;
+    std::cout << "Throughput: " << steps_per_second << " steps/s (frameskip: " << envp::ENVIRONMENT::SPEC::PARAMETERS::FRAME_SKIP << " -> " << frames_per_second << " fps)" << std::endl;
+}
+
+
+template <TI NUM_THREADS>
+class TwoWayBarrier {
+public:
+    TwoWayBarrier() : count(0), waiting(0), waiting2(0) {}
+
+    void wait() {
+        std::unique_lock<std::mutex> lock(mutex);
+        ++count;
+        ++waiting;
+        if (count < NUM_THREADS) {
+            cond.wait(lock, [this] {
+                return this->count == NUM_THREADS;
+            });
+        } else {
+            cond.notify_all();
+            waiting2 = 0;
+        }
+        --waiting;
+        ++waiting2;
+        if (waiting > 0) {
+            cond.wait(lock, [this] {
+                return this->waiting == 0;
+            });
+        } else {
+            cond.notify_all();
+            count = 0;
+        }
+        --waiting2;
+        if (waiting2 > 0) {
+            cond.wait(lock, [this] {
+                return this->waiting2 == 0;
+            });
+        } else {
+            cond.notify_all();
+        }
+    }
+
+private:
+    int count;
+    int waiting;
+    int waiting2;
+    std::condition_variable cond;
+    std::mutex mutex;
+};
+//
+TEST(BACKPROP_TOOLS_RL_ENVIRONMENTS_MUJOCO_ANT, THR
