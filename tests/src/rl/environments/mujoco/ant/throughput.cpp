@@ -159,4 +159,63 @@ private:
     std::mutex mutex;
 };
 //
-TEST(BACKPROP_TOOLS_RL_ENVIRONMENTS_MUJOCO_ANT, THR
+TEST(BACKPROP_TOOLS_RL_ENVIRONMENTS_MUJOCO_ANT, THROUGHPUT_MULTI_CORE_LOCKSTEP){
+    constexpr TI NUM_STEPS_PER_THREAD = 1000;
+    constexpr TI NUM_THREADS = 16;
+
+    DEVICE device;
+    envp::ENVIRONMENT envs[NUM_THREADS];
+    std::thread threads[NUM_THREADS];
+    bpt::MatrixDynamic<bpt::matrix::Specification<T, TI, NUM_THREADS, envp::ENVIRONMENT::ACTION_DIM>> actions;
+    auto proto_rng = bpt::random::default_engine(DEVICE::SPEC::RANDOM(), 10);
+    decltype(proto_rng) rngs[NUM_THREADS];
+
+    for(TI env_i = 0; env_i < NUM_THREADS; env_i++){
+        bpt::malloc(device, envs[env_i]);
+        rngs[env_i] = bpt::random::default_engine(DEVICE::SPEC::RANDOM(), env_i);
+    }
+    bpt::malloc(device, actions);
+
+    TwoWayBarrier<NUM_THREADS> barrier;
+
+    auto start = std::chrono::high_resolution_clock::now();
+    std::vector<int> order;
+    std::mutex order_mutex;
+    T step_time[NUM_THREADS] = {0};
+    for(TI env_i = 0; env_i < NUM_THREADS; env_i++){
+        threads[env_i] = std::thread([&device, &rngs, &actions, &envs, &barrier, &order, &order_mutex, &step_time, env_i](){
+            STATE state, next_state;
+            auto rng = rngs[env_i];
+            auto& env = envs[env_i];
+            auto action = bpt::view(device, actions, bpt::matrix::ViewSpec<1, envp::ENVIRONMENT::ACTION_DIM>(), env_i, 0);
+            bpt::randn(device, action, rng);
+            bpt::sample_initial_state(device, env, state, rng);
+            for(TI step_i = 0; step_i < NUM_STEPS_PER_THREAD; step_i++){
+                bpt::randn(device, action, rng);
+                bpt::step(device, env, state, action, next_state);
+                if(step_i % 1000 == 0 || bpt::terminated(device, env, next_state, rng)) {
+                    bpt::sample_initial_state(device, env, state, rng);
+                }
+                {
+                    std::lock_guard<std::mutex> lock(order_mutex);
+                    order.push_back(env_i);
+                }
+                barrier.wait();
+            }
+        });
+    }
+    for(TI env_i = 0; env_i < NUM_THREADS; env_i++){
+        threads[env_i].join();
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    auto steps_per_second = NUM_STEPS_PER_THREAD * NUM_THREADS * 1000.0 / duration.count();
+    auto frames_per_second = steps_per_second * envp::ENVIRONMENT::SPEC::PARAMETERS::FRAME_SKIP;
+    std::cout << "Throughput: " << steps_per_second << " steps/s (frameskip: " << envp::ENVIRONMENT::SPEC::PARAMETERS::FRAME_SKIP << " -> " << frames_per_second << " fps)" << std::endl;
+
+
+    for(TI i = 0; i < order.size()/NUM_THREADS; i++){
+        bool found[NUM_THREADS] = {false};
+        for(TI j = 0; j < NUM_THREADS; j++){
+            found[order[i*NUM_THREADS + j]] = true;
+      
