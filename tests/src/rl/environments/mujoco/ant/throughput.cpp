@@ -218,4 +218,54 @@ TEST(BACKPROP_TOOLS_RL_ENVIRONMENTS_MUJOCO_ANT, THROUGHPUT_MULTI_CORE_LOCKSTEP){
         bool found[NUM_THREADS] = {false};
         for(TI j = 0; j < NUM_THREADS; j++){
             found[order[i*NUM_THREADS + j]] = true;
-      
+        }
+        for(TI j = 0; j < NUM_THREADS; j++){
+            ASSERT_TRUE(found[j]);
+        }
+    }
+}
+
+TEST(BACKPROP_TOOLS_RL_ENVIRONMENTS_MUJOCO_ANT, THROUGHPUT_MULTI_CORE_SPAWNING){
+    constexpr TI NUM_ROLLOUT_STEPS = 100;
+    constexpr TI NUM_STEPS_PER_ENVIRONMENT = 64;
+    constexpr TI NUM_ENVIRONMENTS = 64;
+    constexpr TI NUM_THREADS = 16;
+    using ACTOR_STRUCTURE_SPEC = bpt::nn_models::mlp::StructureSpecification<T, TI, envp::ENVIRONMENT::OBSERVATION_DIM, envp::ENVIRONMENT::ACTION_DIM, 3, 256, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::nn::activation_functions::IDENTITY>;
+    using ACTOR_SPEC = bpt::nn_models::mlp::AdamSpecification<ACTOR_STRUCTURE_SPEC>;
+    using ACTOR_TYPE = bpt::nn_models::mlp_unconditional_stddev::NeuralNetworkAdam<ACTOR_SPEC>;
+
+    DEVICE device;
+    STATE states[NUM_ENVIRONMENTS], next_states[NUM_ENVIRONMENTS];
+    envp::ENVIRONMENT envs[NUM_ENVIRONMENTS];
+    ACTOR_TYPE actor;
+    ACTOR_TYPE::Buffers<NUM_ENVIRONMENTS> actor_buffers;
+    bpt::MatrixDynamic<bpt::matrix::Specification<T, TI, NUM_ENVIRONMENTS, envp::ENVIRONMENT::ACTION_DIM>> actions;
+    bpt::MatrixDynamic<bpt::matrix::Specification<T, TI, NUM_ENVIRONMENTS, envp::ENVIRONMENT::OBSERVATION_DIM>> observations;
+    auto proto_rng = bpt::random::default_engine(DEVICE::SPEC::RANDOM(), 10);
+    decltype(proto_rng) rngs[NUM_THREADS];
+
+    bpt::malloc(device, actions);
+    bpt::malloc(device, observations);
+    bpt::malloc(device, actor);
+    bpt::malloc(device, actor_buffers);
+    for(TI env_i = 0; env_i < NUM_ENVIRONMENTS; env_i++){
+        bpt::malloc(device, envs[env_i]);
+    }
+
+    bpt::randn(device, actions, proto_rng);
+    bpt::init_weights(device, actor, proto_rng);
+    for(TI env_i = 0; env_i < NUM_ENVIRONMENTS; env_i++){
+        bpt::sample_initial_state(device, envs[env_i], states[env_i], proto_rng);
+        auto observation = bpt::view(device, observations, bpt::matrix::ViewSpec<1, envp::ENVIRONMENT::OBSERVATION_DIM>(), env_i, 0);
+        bpt::observe(device,envs[env_i], states[env_i], observation);
+    }
+
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for(TI rollout_step_i = 0; rollout_step_i < NUM_ROLLOUT_STEPS; rollout_step_i++){
+        std::cout << "Rollout step " << rollout_step_i << std::endl;
+        for(TI step_i = 0; step_i < NUM_STEPS_PER_ENVIRONMENT; step_i++) {
+            std::thread threads[NUM_THREADS];
+            for(TI thread_i = 0; thread_i < NUM_THREADS; thread_i++){
+                threads[thread_i] = std::thread([&device, &rngs, &actions, &observations, &envs, &states, &next_states, thread_i, step_i](){
+                    for(
