@@ -268,4 +268,46 @@ TEST(BACKPROP_TOOLS_RL_ENVIRONMENTS_MUJOCO_ANT, THROUGHPUT_MULTI_CORE_SPAWNING){
             std::thread threads[NUM_THREADS];
             for(TI thread_i = 0; thread_i < NUM_THREADS; thread_i++){
                 threads[thread_i] = std::thread([&device, &rngs, &actions, &observations, &envs, &states, &next_states, thread_i, step_i](){
-                    for(
+                    for(TI env_i = thread_i; env_i < NUM_ENVIRONMENTS; env_i += NUM_THREADS){
+                        auto rng = rngs[thread_i];
+                        auto& env = envs[env_i];
+                        auto& state = states[env_i];
+                        auto& next_state = next_states[env_i];
+                        auto action = bpt::view(device, actions, bpt::matrix::ViewSpec<1, envp::ENVIRONMENT::ACTION_DIM>(), env_i, 0);
+                        auto observation = bpt::view(device, observations, bpt::matrix::ViewSpec<1, envp::ENVIRONMENT::OBSERVATION_DIM>(), env_i, 0);
+                        bpt::step(device, env, state, action, next_state);
+                        if(step_i % 1000 == 0 || bpt::terminated(device, env, next_state, rng)) {
+                            bpt::sample_initial_state(device, env, state, rng);
+                        }
+                        else{
+                            next_state = state;
+                        }
+                        bpt::observe(device, env, next_state, observation);
+                    }
+                });
+            }
+            for(TI env_i = 0; env_i < NUM_THREADS; env_i++){
+                threads[env_i].join();
+            }
+            bpt::evaluate(device, actor, observations, actions, actor_buffers);
+        }
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    auto steps_per_second = NUM_STEPS_PER_ENVIRONMENT * NUM_ENVIRONMENTS * NUM_ROLLOUT_STEPS * 1000.0 / duration.count();
+    auto frames_per_second = steps_per_second * envp::ENVIRONMENT::SPEC::PARAMETERS::FRAME_SKIP;
+    std::cout << "Throughput: " << steps_per_second << " steps/s (frameskip: " << envp::ENVIRONMENT::SPEC::PARAMETERS::FRAME_SKIP << " -> " << frames_per_second << " fps)" << std::endl;
+}
+
+TEST(BACKPROP_TOOLS_RL_ENVIRONMENTS_MUJOCO_ANT, THROUGHPUT_MULTI_CORE_INDEPENDENT_FORWARD_PASS){
+    constexpr TI NUM_STEPS_PER_THREAD = 1000;
+    constexpr TI NUM_THREADS = 16;
+    using ACTOR_STRUCTURE_SPEC = bpt::nn_models::mlp::StructureSpecification<T, TI, envp::ENVIRONMENT::OBSERVATION_DIM, envp::ENVIRONMENT::ACTION_DIM, 3, 256, bpt::nn::activation_functions::ActivationFunction::TANH, bpt::nn::activation_functions::IDENTITY>;
+    using ACTOR_SPEC = bpt::nn_models::mlp::AdamSpecification<ACTOR_STRUCTURE_SPEC>;
+    using ACTOR_TYPE = bpt::nn_models::mlp_unconditional_stddev::NeuralNetworkAdam<ACTOR_SPEC>;
+
+
+    DEVICE device;
+    envp::ENVIRONMENT envs[NUM_THREADS];
+    std::thread threads[NUM_THREADS];
+    bpt::MatrixDynamic<bpt::matrix::Specification<T, TI, NUM_THREADS, envp::ENVIRONMENT::
