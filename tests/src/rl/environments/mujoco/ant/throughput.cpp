@@ -360,4 +360,51 @@ TEST(BACKPROP_TOOLS_RL_ENVIRONMENTS_MUJOCO_ANT, THROUGHPUT_MULTI_CORE_INDEPENDEN
 }
 //
 TEST(BACKPROP_TOOLS_RL_ENVIRONMENTS_MUJOCO_ANT, THROUGHPUT_MULTI_CORE_COLLECTIVE_FORWARD_PASS_TAKE_AWAY){
-    constexpr TI NUM_S
+    constexpr TI NUM_STEPS_PER_ENVIRONMENT = 10000;
+    constexpr TI NUM_THREADS = 16;
+    constexpr TI NUM_ENVIRONMENTS = 64;
+    using ACTOR_STRUCTURE_SPEC = bpt::nn_models::mlp::StructureSpecification<T, TI, envp::ENVIRONMENT::OBSERVATION_DIM, envp::ENVIRONMENT::ACTION_DIM, 3, 256, bpt::nn::activation_functions::ActivationFunction::RELU, bpt::nn::activation_functions::IDENTITY>;
+    using ACTOR_SPEC = bpt::nn_models::mlp::AdamSpecification<ACTOR_STRUCTURE_SPEC>;
+    using ACTOR_TYPE = bpt::nn_models::mlp_unconditional_stddev::NeuralNetworkAdam<ACTOR_SPEC>;
+
+
+    DEVICE device;
+    envp::ENVIRONMENT envs[NUM_ENVIRONMENTS];
+    STATE states[NUM_ENVIRONMENTS], next_states[NUM_ENVIRONMENTS];
+    std::thread threads[NUM_THREADS];
+    bpt::MatrixDynamic<bpt::matrix::Specification<T, TI, NUM_ENVIRONMENTS, envp::ENVIRONMENT::ACTION_DIM>> actions;
+    bpt::MatrixDynamic<bpt::matrix::Specification<T, TI, NUM_ENVIRONMENTS, envp::ENVIRONMENT::OBSERVATION_DIM>> observations;
+    ACTOR_TYPE actor;
+    ACTOR_TYPE::Buffers<NUM_ENVIRONMENTS> actor_buffers;
+    auto proto_rng = bpt::random::default_engine(DEVICE::SPEC::RANDOM(), 10);
+    decltype(proto_rng) rngs[NUM_THREADS];
+    TwoWayBarrier<NUM_THREADS> barrier_1, barrier_2;
+
+    for(TI env_i = 0; env_i < NUM_ENVIRONMENTS; env_i++){
+        bpt::malloc(device, envs[env_i]);
+    }
+    bpt::malloc(device, actions);
+    bpt::malloc(device, observations);
+    bpt::malloc(device, actor);
+    bpt::malloc(device, actor_buffers);
+
+    bpt::init_weights(device, actor, proto_rng);
+
+    std::atomic<unsigned long> barrier_1_wait_time = 0, barrier_2_wait_time = 0, evaluation_time = 0;
+    TI next_env = 0;
+    std::mutex next_env_lock;
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for (TI env_i = 0; env_i < NUM_ENVIRONMENTS; env_i++) {
+        bpt::sample_initial_state(device, envs[env_i], states[env_i], proto_rng);
+        auto observation = bpt::view(device, observations, bpt::matrix::ViewSpec<1, envp::ENVIRONMENT::OBSERVATION_DIM>(), env_i, 0);
+        bpt::observe(device, envs[env_i], states[env_i], observation);
+    }
+    for(TI thread_i = 0; thread_i < NUM_THREADS; thread_i++){
+        threads[thread_i] = std::thread([&device, &states, &next_states, &actor_buffers, &next_env_lock, &next_env, &barrier_1, &evaluation_time, &barrier_1_wait_time, &barrier_2_wait_time, &barrier_2, &actor, &rngs, &observations, &actions, &envs, thread_i](){
+            auto rng = rngs[thread_i];
+            for(TI step_i = 0; step_i < NUM_STEPS_PER_ENVIRONMENT; step_i++){
+                {
+                    auto start = std::chrono::high_resolution_clock::now();
+                    barrier_1.wait();
+                    auto end = std::chr
