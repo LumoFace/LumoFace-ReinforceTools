@@ -407,4 +407,53 @@ TEST(BACKPROP_TOOLS_RL_ENVIRONMENTS_MUJOCO_ANT, THROUGHPUT_MULTI_CORE_COLLECTIVE
                 {
                     auto start = std::chrono::high_resolution_clock::now();
                     barrier_1.wait();
-                    auto end = std::chr
+                    auto end = std::chrono::high_resolution_clock::now();
+                    barrier_1_wait_time += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+                }
+                if(thread_i == 0){
+                    next_env = 0;
+                    {
+                        auto start = std::chrono::high_resolution_clock::now();
+                        bpt::evaluate(device, actor, observations, actions, actor_buffers);
+                        auto end = std::chrono::high_resolution_clock::now();
+                        evaluation_time += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+                    }
+                }
+                {
+                    auto start = std::chrono::high_resolution_clock::now();
+                    barrier_2.wait();
+                    auto end = std::chrono::high_resolution_clock::now();
+                    barrier_2_wait_time += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+                }
+                TI current_env = 0;
+                while(current_env < NUM_ENVIRONMENTS){
+                    {
+                        std::lock_guard<std::mutex> lock(next_env_lock);
+                        current_env = next_env;
+                        if(next_env < NUM_ENVIRONMENTS){
+//                            std::cout << "Thread " << thread_i << " is working on environment " << next_env << std::endl;
+                            next_env++;
+                        }
+                        else{
+                            break;
+                        }
+                    }
+                    auto action = bpt::view(device, actions, bpt::matrix::ViewSpec<1, envp::ENVIRONMENT::ACTION_DIM>(), current_env, 0);
+                    bpt::step(device, envs[current_env], states[current_env], action, next_states[current_env]);
+                    if(step_i % 1000 == 0 || bpt::terminated(device, envs[current_env], next_states[current_env], rng)) {
+                        bpt::sample_initial_state(device, envs[current_env], states[current_env], rng);
+                    }
+                    auto observation = bpt::view(device, observations, bpt::matrix::ViewSpec<1, envp::ENVIRONMENT::OBSERVATION_DIM>(), current_env, 0);
+                    bpt::observe(device, envs[current_env], states[current_env], observation);
+                }
+            }
+        });
+    }
+    for(TI env_i = 0; env_i < NUM_THREADS; env_i++){
+        threads[env_i].join();
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    auto steps_per_second 
