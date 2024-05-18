@@ -497,4 +497,41 @@ TEST(BACKPROP_TOOLS_RL_ENVIRONMENTS_MUJOCO_ANT, THROUGHPUT_MULTI_CORE_COLLECTIVE
 
     bpt::init_weights(device, actor, proto_rng);
 
-   
+    std::atomic<unsigned long> barrier_1_wait_time = 0, barrier_2_wait_time = 0, evaluation_time = 0;
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for(TI full_step_i = 0; full_step_i < NUM_FULL_STEPS; full_step_i++){
+        for (TI env_i = 0; env_i < NUM_ENVIRONMENTS; env_i++) {
+            bpt::sample_initial_state(device, envs[env_i], states[env_i], proto_rng);
+            auto observation = bpt::view(device, observations, bpt::matrix::ViewSpec<1, envp::ENVIRONMENT::OBSERVATION_DIM>(), env_i, 0);
+            bpt::observe(device, envs[env_i], states[env_i], observation);
+        }
+        for(TI thread_i = 0; thread_i < NUM_THREADS; thread_i++){
+            threads[thread_i] = std::thread([&device, &states, &next_states, &actor_buffers, &barrier_1, &evaluation_time, &barrier_1_wait_time, &barrier_2_wait_time, &barrier_2, &actor, &rngs, &observations, &actions, &envs, thread_i](){
+                auto rng = rngs[thread_i];
+                for(TI step_i = 0; step_i < NUM_STEPS_PER_ENVIRONMENT; step_i++){
+                    {
+                        auto start = std::chrono::high_resolution_clock::now();
+                        barrier_1.wait();
+                        auto end = std::chrono::high_resolution_clock::now();
+                        barrier_1_wait_time += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+                    }
+                    if(thread_i == 0){
+                        {
+                            auto start = std::chrono::high_resolution_clock::now();
+                            bpt::evaluate(device, actor, observations, actions, actor_buffers);
+                            auto end = std::chrono::high_resolution_clock::now();
+                            evaluation_time += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+                        }
+                    }
+                    {
+                        auto start = std::chrono::high_resolution_clock::now();
+                        barrier_2.wait();
+                        auto end = std::chrono::high_resolution_clock::now();
+                        barrier_2_wait_time += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+                    }
+                    for(TI env_i = thread_i; env_i < NUM_ENVIRONMENTS; env_i += NUM_THREADS){
+                        auto action = bpt::view(device, actions, bpt::matrix::ViewSpec<1, envp::ENVIRONMENT::ACTION_DIM>(), env_i, 0);
+                        auto observation = bpt::view(device, observations, bpt::matrix::ViewSpec<1, envp::ENVIRONME
