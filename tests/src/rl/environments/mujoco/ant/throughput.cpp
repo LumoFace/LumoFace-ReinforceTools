@@ -534,4 +534,27 @@ TEST(BACKPROP_TOOLS_RL_ENVIRONMENTS_MUJOCO_ANT, THROUGHPUT_MULTI_CORE_COLLECTIVE
                     }
                     for(TI env_i = thread_i; env_i < NUM_ENVIRONMENTS; env_i += NUM_THREADS){
                         auto action = bpt::view(device, actions, bpt::matrix::ViewSpec<1, envp::ENVIRONMENT::ACTION_DIM>(), env_i, 0);
-                        auto observation = bpt::view(device, observations, bpt::matrix::ViewSpec<1, envp::ENVIRONME
+                        auto observation = bpt::view(device, observations, bpt::matrix::ViewSpec<1, envp::ENVIRONMENT::OBSERVATION_DIM>(), env_i, 0);
+                        bpt::step(device, envs[env_i], states[env_i], action, next_states[env_i]);
+                        if(step_i % 1000 == 0 || bpt::terminated(device, envs[env_i], next_states[env_i], rng)) {
+                            bpt::sample_initial_state(device, envs[env_i], states[env_i], rng);
+                        }
+                        bpt::observe(device, envs[env_i], states[env_i], observation);
+                    }
+                }
+            });
+        }
+        for(TI env_i = 0; env_i < NUM_THREADS; env_i++){
+            threads[env_i].join();
+        }
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    auto steps_per_second = NUM_STEPS_PER_ENVIRONMENT * NUM_ENVIRONMENTS * NUM_FULL_STEPS * 1000000.0 / duration.count();
+    auto frames_per_second = steps_per_second * envp::ENVIRONMENT::SPEC::PARAMETERS::FRAME_SKIP;
+    auto barrier_1_wait_time_fraction = (double)barrier_1_wait_time / duration.count() / NUM_THREADS;
+    auto barrier_2_wait_time_fraction = (double)barrier_2_wait_time / duration.count() / NUM_THREADS;
+    auto evaluation_time_per_eval = (double)evaluation_time / (double)NUM_STEPS_PER_ENVIRONMENT;
+    auto evaluation_time_fraction = (double)evaluation_time / duration.count();
+    std::cout << "Throughput: " << steps_per_second << " steps/s (frameskip: " << envp::ENVIRONMENT::SPEC::PARAMETERS::FRAME_SKIP << " -> " << frames_per_second << " fps) barrier_wait_time_fractions: " << barrier_1_wait_time_fraction << " : " << barrier_2_wait_time_fraction << " evaluation time per step: " << evaluation_time_per_eval << " fraction: " << evaluation_time_fraction << std::endl;
+}
